@@ -19,8 +19,11 @@ import {
   Sparkles,
   BarChart3,
   ScrollText,
+  Search,
 } from "lucide-react";
 import { Logo } from "@/components/site/logo";
+import { CommandPalette } from "./command-palette";
+import { NotificationsBell } from "./notifications-bell";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -50,6 +53,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const qc = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const { data, isLoading } = useQuery<{ org: SessionOrg | null }>({
     queryKey: ["session"],
@@ -94,18 +98,40 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <SidebarContent org={org} user={authData?.user ?? null} pathname={pathname} onNavigate={() => {}} onSignOut={() => signOut.mutate()} />
       </aside>
 
+      {/* desktop topbar */}
+      <header className="sticky top-0 z-30 hidden h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-xl lg:flex">
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="group flex w-72 items-center gap-2.5 rounded-lg border border-border bg-card/50 px-3 h-9 text-[12.5px] text-muted-foreground transition-colors hover:border-mint/40 hover:text-mint"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span>Search invoices, buyers, cases…</span>
+          <kbd className="ml-auto rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[9px] tracking-[0.06em] text-muted-foreground">⌘K</kbd>
+        </button>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card/50 px-3 h-9">
+            <span className="h-1.5 w-1.5 rounded-full bg-mint animate-pulse-dot" />
+            <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-foreground">engine live</span>
+          </div>
+          <NotificationsBell />
+        </div>
+      </header>
+
       {/* mobile topbar */}
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/85 px-4 backdrop-blur-xl lg:hidden">
         <Link href="/console" aria-label="Recovery OS console">
           <Logo />
         </Link>
-        <button
-          onClick={() => setMenuOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border"
-          aria-label="Open menu"
-        >
-          <Menu className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationsBell />
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       {menuOpen && (
@@ -134,6 +160,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-8 sm:py-10">{children}</main>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Inbox, ChevronRight, FileText, Send, FolderCheck, Scale, Landmark as Award, Upload } from "lucide-react";
+import { RefreshCw, Plus, Search, Inbox, ChevronRight, FileText, Send, FolderCheck, Scale, Landmark as Award, Upload, Download } from "lucide-react";
 import { PageHead, StatusChip, LiveInterest, EmptyState, fmtDate, inrCompact } from "./kit";
 import { inr } from "@/lib/format";
 import { InvoiceDrawer } from "./invoice-drawer";
@@ -75,6 +75,13 @@ export default function InvoicesPage() {
           <Upload className="h-4 w-4" />
           Import CSV
         </button>
+        <a
+          href={`/api/invoices/export?filter=${filter}`}
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 h-10 text-[13px] font-medium transition-colors hover:border-mint/40 hover:text-mint"
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </a>
         <button
           onClick={() => setAddOpen(true)}
           className="inline-flex items-center gap-2 rounded-lg bg-mint px-4 h-10 text-[13px] font-semibold text-[#04140b] transition-colors hover:bg-[#4df7ae]"

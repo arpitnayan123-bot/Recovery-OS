@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw, FilePlus2, ArrowRight, Scale, Inbox, Radio, Sparkles } from "lucide-react";
-import { StatCard, LiveInterest, Bar, PageHead, inrCompact, fmtDate } from "@/components/console/kit";
+import { StatCard, LiveInterest, Bar, PageHead, inrCompact, fmtDate, AnimatedNumber } from "@/components/console/kit";
 import { inr } from "@/lib/format";
 import { EventRow, DeadlineBadge } from "@/components/console/event-row";
 import { CASE_STAGE_META } from "@/lib/domain";
@@ -109,7 +109,7 @@ export default function ConsoleOverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Outstanding principal"
-          value={inrCompact(kpis.outstanding)}
+          value={<AnimatedNumber value={kpis.outstanding} format="inrCompact" />}
           sub={`${kpis.liveCount} live invoices · ${kpis.overdueCount} past the statutory term`}
         />
         <StatCard
@@ -121,13 +121,13 @@ export default function ConsoleOverviewPage() {
         <StatCard
           label="Total claimable"
           tone="mint"
-          value={inrCompact(kpis.claimable)}
+          value={<AnimatedNumber value={kpis.claimable} format="inrCompact" />}
           sub="Principal + statutory interest, MSEFC-enforceable"
         />
         <StatCard
           label="Recovered"
           tone="mint"
-          value={inrCompact(kpis.recoveredAmount)}
+          value={<AnimatedNumber value={kpis.recoveredAmount} format="inrCompact" />}
           sub={`${kpis.recoveredCount} closed · net to supplier ${inrCompact(kpis.netToSupplier)} · fee ${(kpis.feeRate * 100).toFixed(1)}% ${inrCompact(kpis.successFees)}`}
         />
       </div>

@@ -162,6 +162,45 @@ export function LiveInterest({
 
 /* -------------------------------- stat cards ------------------------------- */
 
+/** Easing-based count-up from 0 → target on mount (or when target changes). */
+export function AnimatedNumber({
+  value,
+  format = "inr",
+  duration = 900,
+  decimals = 0,
+}: {
+  value: number;
+  format?: "inr" | "inrCompact" | "plain" | "count";
+  duration?: number;
+  decimals?: number;
+}) {
+  const [display, setDisplay] = useState(0);
+  const fromRef = useRef(0);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      // ease-out-cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = from + (value - from) * eased;
+      setDisplay(current);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+
+  const rounded = Math.round(display);
+  if (format === "inr") return <span className="tabular-nums">{inr(rounded)}</span>;
+  if (format === "inrCompact") return <span className="tabular-nums">{inrCompact(display)}</span>;
+  if (format === "count") return <span className="tabular-nums">{rounded.toLocaleString("en-IN")}</span>;
+  return <span className="tabular-nums">{formatIndian(display, decimals)}</span>;
+}
+
 export function StatCard({
   label,
   value,

@@ -83,3 +83,62 @@ Stage Summary:
 - Two AI skills live in-product: LLM (insights) + web_search (buyer diligence), both with deterministic fallbacks so the product never breaks if the AI is unreachable
 - Verification: lint clean, 12/12 routes 200, agent-browser E2E (signup→console, AI insights with real invoice actions, buyer diligence with real web sources, CSV import+dedupe, PDF generation ×3 kinds, audit log, cron tick, mobile 390px), zero console errors
 - Artifacts: download/e2e-console-upgraded.png, e2e-ai-insights.png, e2e-analytics.png, e2e-import-dialog-open.png, e2e-buyer-diligence.png, e2e-audit-log.png, e2e-signup-result.png, e2e-console-authed.png, e2e-homepage-upgraded.png, e2e-mobile-home.png, e2e-mobile-console.png
+
+---
+Task ID: 2
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional: 13 console routes + 9 API routes all return 200, lint clean, zero console errors
+- QA verified via agent-browser: overview, invoices, cases, buyers, insights, analytics, activity, audit, settings all render without errors
+- Core pipeline works end-to-end (served statutory demand on ORBT/2231 → status changed "Watching" → "Notice served", evidence-pack step appeared)
+- PDF generation confirmed (statutory_notice: 200, application/pdf, 4.7KB)
+- AI insights + buyer due diligence (web search) both functional from previous round
+- No bugs, no runtime errors, no build failures found — project is in a stable phase
+
+## Current goals/completed modifications/verification results
+This round focused on **premium UX features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Command Palette (Cmd+K) ✅
+- New API: `/api/search?q=...` — fuzzy search across invoices (by number/buyer), buyers (by name/GSTIN), cases (by case#/buyer/invoice#), + console pages. Returns grouped, tone-tagged results with ₹ amounts and overdue days.
+- New component: `src/components/console/command-palette.tsx` — controlled (open/onOpenChange), global Cmd/Ctrl+K shortcut, Esc to close, keyboard arrow navigation + Enter to open, debounced 120ms search, grouped results (Pages / Invoices / Buyers / Cases) with type icons + tone dots + meta, footer with keyboard hints
+- Wired into console shell: new desktop topbar with a search trigger button showing "⌘K" kbd hint; palette rendered at shell root
+- E2E: typed "meru" → returned 2 Meru invoices + Meru buyer; typed "north" → returned 2 Northstar invoices + Northstar buyer
+
+### Feature 2 — Notifications Bell + dropdown ✅
+- New component: `src/components/console/notifications-bell.tsx` — bell button with unread count badge (mint), polls /api/overview feed every 30s, dropdown with recent events (type badge, title, detail, relative time), "new" highlight for unseen events, "Full activity log" footer → /console/activity, localStorage-tracked lastSeen, outside-click-to-close
+- Wired into console shell topbar (both desktop + mobile)
+- E2E: dropdown opens showing "MACHINE FEED" header, recent events with SYNC/DETECT/NOTICE badges, "ALL CAUGHT UP" when no unread
+
+### Feature 3 — CSV Export ✅
+- New API: `/api/invoices/export?filter=all|overdue|recovery|watch|recovered` — exports 16-column CSV (number, buyer, gstin, city, amount, issuedOn, dueOn, daysOverdue, status, interest_accrued, total_claimable, case_number, case_stage, recovered_at, recovered_amount, success_fee) with proper RFC-4180 escaping, Content-Disposition attachment header, date-stamped filename
+- Export button on invoices page (next to Import CSV), respects active filter
+- E2E: exported all invoices → 200, text/csv, valid CSV with headers + data rows
+
+### Feature 4 — Animated number counters (styling polish) ✅
+- New `AnimatedNumber` component in kit.tsx — ease-out-cubic count-up from previous value → target using requestAnimationFrame, supports inr/inrCompact/count/plain formats, 900ms duration
+- Applied to overview KPI cards: Outstanding principal, Total claimable, Recovered (§16 interest card keeps LiveInterest ticker)
+- E2E: KPI values animate on page load
+
+### Cross-cutting styling polish ✅
+- New desktop topbar (sticky, h-14, backdrop-blur) with: search trigger button, "engine live" status pill (mint pulse dot), notifications bell
+- Mobile topbar updated: logo + notifications bell + hamburger (was just logo + hamburger)
+- Both topbars are responsive (desktop hidden on mobile, vice versa)
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: /api/search 401-without-session (correct), /api/invoices/export 401-without-session (correct), both 200 with session
+- agent-browser E2E: Cmd+K opens palette + returns correct grouped results, notifications dropdown shows feed, export downloads CSV, animated counters render, mobile 390px topbar responsive, zero console errors
+- Artifacts: download/qa-7-topbar.png, qa-8-notifications.png, qa-9-animated-kpis.png, qa-10-final-overview.png, qa-11-mobile-topbar.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Bulk invoice actions** — select multiple invoices via checkboxes + bulk-serve/bulk-file (high-value for suppliers with 50+ overdue invoices)
+  2. **Recovery forecast** — AI-predicted "if no action taken, you'll lose ₹X in interest over 30 days" projection on the overview (uses LLM, high visual impact)
+  3. **Invoice detail enhancements** — add Evidence Pack + ODR Dossier PDF download buttons alongside the statutory notice PDF (the API already supports all 3 kinds)
+  4. **Settings page enrichment** — show user account info, change-password form, connected sources management
+  5. **Theme toggle** — light/dark switch (currently dark-only; the marketing page has a .theme-light scope that could be extended)
+  6. **Email notification preferences** — let users choose which machine-feed events trigger email alerts (ties into the reminder engine)
