@@ -255,7 +255,7 @@ const PhoneFrame = () => (
         style={delay(240)}
         className={`${REVEAL} relative flex w-full shrink-0 flex-col items-start justify-center gap-[8px]`}
       >
-        <GetStartedButton href="/onboarding" label="Start recovery" className="w-full px-[24px] py-[14px]" />
+        <GetStartedButton href="/login" label="Sign in" className="w-full px-[24px] py-[14px]" />
         <SecondaryButton href="#product" label="See how it works" className="w-full px-[24px] py-[14px]" />
       </div>
     </div>
@@ -327,7 +327,7 @@ const TabletFrame = () => (
         style={delay(240)}
         className={`${REVEAL} relative flex shrink-0 items-center gap-[12px]`}
       >
-        <GetStartedButton href="/onboarding" label="Start recovery" className="px-[24px] py-[16px]" />
+        <GetStartedButton href="/login" label="Sign in" className="px-[24px] py-[16px]" />
         <SecondaryButton href="#product" label="See how it works" className="px-[24px] py-[16px]" />
       </div>
     </div>
@@ -400,7 +400,7 @@ const DesktopFrame = () => (
         style={delay(240)}
         className={`${REVEAL} relative flex shrink-0 items-center gap-[12px]`}
       >
-        <GetStartedButton href="/onboarding" label="Start recovery" className="px-[24px] py-[16px]" />
+        <GetStartedButton href="/login" label="Sign in" className="px-[24px] py-[16px]" />
         <SecondaryButton href="#product" label="See how it works" className="px-[24px] py-[16px]" />
       </div>
     </div>
