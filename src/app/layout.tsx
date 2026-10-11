@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { PicoWidget } from "@/components/pico/pico-widget";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -82,6 +83,7 @@ export default function RootLayout({
         className={`${display.variable} ${inter.variable} ${mono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         {children}
+        <PicoWidget />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

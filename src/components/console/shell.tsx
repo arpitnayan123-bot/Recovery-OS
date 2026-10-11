@@ -27,7 +27,6 @@ import { CommandPalette } from "./command-palette";
 import { NotificationsBell } from "./notifications-bell";
 import { ThemeToggle } from "./theme-toggle";
 import { ShortcutsHelp } from "./shortcuts-help";
-import { GuideAvatar } from "./guide-avatar";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { cn } from "@/lib/utils";
 
@@ -182,7 +181,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ShortcutsHelp />
-      <GuideAvatar />
     </div>
   );
 }
