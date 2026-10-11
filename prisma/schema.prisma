@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Org {
+  id        String    @id @default(cuid())
+  name      String
+  contact   String?
+  gstin     String?
+  city      String?
+  source    String    @default("manual") // tally | zoho | csv | manual
+  isDemo    Boolean   @default(false)
+  userId    String?   // owning user (null for demo-only orgs)
+  createdAt DateTime  @default(now())
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invoices  Invoice[]
+  cases     Case[]
+  events    Event[]
+  insights  Insight[]
+  imports   ImportBatch[]
+  auditLogs AuditLog[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orgs         Org[]
+}
+
+model Buyer {
+  id         String           @id @default(cuid())
+  orgId      String
+  name       String
+  gstin      String?
+  city       String?
+  invoices   Invoice[]
+  diligence  BuyerDiligence?
+
+  @@unique([orgId, name])
+}
+
+model Invoice {
+  id              String     @id @default(cuid())
+  orgId           String
+  buyerId         String
+  number          String
+  amount          Float
+  issuedOn        DateTime
+  dueOn           DateTime // issued + 45 days (MSMED §15)
+  status          String     @default("watch") // watch | reminder_sent | evidence_ready | odr_filed | hearing | award | recovered
+  recoveredAt     DateTime?
+  recoveredAmount Float?
+  successFee      Float?
+  org             Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  buyer           Buyer      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  events          Event[]
+  case            Case?
+  reminders       Reminder[]
+  documents       Document[]
+  createdAt       DateTime   @default(now())
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  orgId     String
+  invoiceId String?
+  type      String // sync | detect | notice | evidence | filed | admitted | hearing | award | recovered | system | insight | diligence | import
+  title     String
+  detail    String?
+  createdAt DateTime @default(now())
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Case {
+  id          String    @id @default(cuid())
+  orgId       String
+  invoiceId   String    @unique
+  caseNumber  String
+  stage       String    @default("filed") // filed | admitted | hearing | award
+  filedOn     DateTime  @default(now())
+  hearingOn   DateTime?
+  awardAmount Float?
+  org         Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  invoiceId String
+  channel   String   @default("email") // email | whatsapp | rpad | sms
+  kind      String // pre_45 | statutory | escalation | hearing
+  subject   String
+  body      String
+  status    String   @default("queued") // queued | sent | failed | delivered | read
+  sentOn    DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  invoiceId String
+  kind      String // tax_invoice | po | challan | gst_filing | ledger | statutory_notice | evidence_pack | odr_dossier
+  name      String
+  status    String   @default("verified") // extracting | verified | generated
+  payload   String?  // JSON blob (e.g. notice text, diligence signals)
+  createdAt DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+/* ----- New: cached AI insights per org ----- */
+model Insight {
+  id        String   @id @default(cuid())
+  orgId     String
+  kind      String // portfolio_brief | buyer_diligence | action_plan
+  payload   String  // JSON blob
+  createdAt DateTime @default(now())
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, kind, createdAt])
+}
+
+/* ----- New: buyer due diligence (web-search enriched risk report) ----- */
+model BuyerDiligence {
+  id          String   @id @default(cuid())
+  buyerId     String   @unique
+  summary     String
+  riskLevel   String   // low | moderate | elevated | high
+  riskScore   Int      // 0-100 (100 = safest)
+  signals     String   // JSON array of {type, text, source, tone}
+  sources     String   // JSON array of {url, name, snippet, host_name, date}
+  runAt       DateTime @default(now())
+  buyer       Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+}
+
+/* ----- New: CSV / source import batches ----- */
+model ImportBatch {
+  id        String   @id @default(cuid())
+  orgId     String
+  filename  String
+  source    String   @default("csv") // csv | tally | zoho
+  total     Int      @default(0)
+  created   Int      @default(0)
+  skipped   Int      @default(0)
+  errors    String   @default("[]") // JSON array of row-level errors
+  createdAt DateTime @default(now())
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+/* ----- New: append-only audit log (security & accountability) ----- */
+model AuditLog {
+  id        String   @id @default(cuid())
+  orgId     String
+  actor     String   // user email | system | demo
+  action    String // auth.login | auth.signup | import.run | invoice.advance | diligence.run | insight.run | session.end
+  meta      String   @default("{}") // JSON blob
+  createdAt DateTime @default(now())
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+}
