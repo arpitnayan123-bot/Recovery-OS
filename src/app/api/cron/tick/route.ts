@@ -35,7 +35,19 @@ async function runTick() {
   let promoted = 0;
   let clockAlerts = 0;
   let forecastAlerts = 0;
+  let demoOrgsDeleted = 0;
   const perOrg: { org: string; queued: number; promoted: number; clockAlerts: number; forecastAlerts?: number }[] = [];
+
+  // Gap 7: Clean up demo orgs older than 7 days
+  const sevenDaysAgo = new Date(now.getTime() - 7 * DAY);
+  const oldDemoOrgs = await prisma.org.findMany({
+    where: { isDemo: true, createdAt: { lt: sevenDaysAgo } },
+    select: { id: true },
+  });
+  if (oldDemoOrgs.length > 0) {
+    await prisma.org.deleteMany({ where: { id: { in: oldDemoOrgs.map((o) => o.id) } } });
+    demoOrgsDeleted = oldDemoOrgs.length;
+  }
 
   for (const org of orgs) {
     // load this org's digest preferences (or defaults)
@@ -181,7 +193,7 @@ async function runTick() {
 
   if (orgs[0]) await audit(orgs[0].id, "system", AUDIT.CRON_TICK, { scanned, queued, promoted, clockAlerts, forecastAlerts, orgs: orgs.length });
 
-  return { scanned, queued, promoted, clockAlerts, forecastAlerts, perOrg, ranAt: now.toISOString() };
+  return { scanned, queued, promoted, clockAlerts, forecastAlerts, demoOrgsDeleted, perOrg, ranAt: now.toISOString() };
 }
 
 export async function GET(req: Request) {
