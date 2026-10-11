@@ -20,6 +20,7 @@ import {
   BarChart3,
   ScrollText,
   Search,
+  UserCircle,
 } from "lucide-react";
 import { Logo } from "@/components/site/logo";
 import { CommandPalette } from "./command-palette";
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/console", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/console/profile", label: "Profile", icon: UserCircle },
   { href: "/console/invoices", label: "Invoices", icon: FileText },
   { href: "/console/cases", label: "ODR cases", icon: Scale },
   { href: "/console/buyers", label: "Buyers", icon: Building2 },
@@ -202,7 +204,7 @@ function SidebarContent({
         <Link href="/console" onClick={onNavigate} aria-label="Console home">
           <Logo />
         </Link>
-        <div className="mt-5 rounded-lg border border-border bg-card p-3">
+        <Link href="/console/profile" onClick={onNavigate} className="mt-5 block rounded-lg border border-border bg-card p-3 transition-colors hover:border-mint/30">
           <p className="truncate font-display text-[13px] font-semibold" title={org.name}>
             {org.name}
           </p>
@@ -229,7 +231,7 @@ function SidebarContent({
               create account to keep this workspace →
             </Link>
           )}
-        </div>
+        </Link>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4" aria-label="Console">

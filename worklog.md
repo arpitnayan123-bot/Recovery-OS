@@ -473,3 +473,45 @@ This round added **3 new features** (mandatory per cron instructions):
   3. **Email digest test send** — a "send test alert" button on the settings page that triggers a sample reminder through the enabled channels
   4. **Forecast threshold alert** — wire the forecastThreshold from DigestPreference into the cron/tick so it queues an alert when the daily §16 bleed exceeds the threshold
   5. **Keyboard shortcut for bulk action** — `b` to open the bulk action dialog when invoices are selected
+
+---
+Task ID: 10
+Agent: Super Z (user-directed feature)
+Task: When Recovery OS is on, show it in a beautiful profile section with all consumer details.
+
+## Current project status description/assessment
+- Recovery OS was stable coming in (14 console routes, lint clean). The user requested a dedicated profile page that shows the Recovery OS engine status + all consumer/supplier details.
+- No bugs found — the project was stable, so this round built the profile feature the user asked for.
+
+## Current goals/completed modifications/verification results
+This round added **a beautiful profile page** showing the Recovery OS engine status + all consumer details:
+
+### New: `/console/profile` page + `/api/profile` endpoint ✅
+- New API: `/api/profile` (GET) — aggregates the full consumer profile in one call: org details (name, GSTIN, city, contact, source, isDemo, createdAt), linked user account (email, name, phone, member-since), engine status (on/idle + live invoice count + monitoring flag), live KPIs (outstanding, overdue, §16 interest accrued, claimable, recovered, fees, net-to-supplier), pipeline distribution (5 stages), top 5 counterparty exposures, digest preferences summary (channels + alert triggers + cadence + threshold), and workspace activity (total events, import batches, audit entries, active/awarded cases).
+- New page: `src/app/console/profile/page.tsx` — a premium profile with:
+  - **Hero header** — avatar (initials) with a Recovery-OS-engine status dot (mint Zap when on), org name + GSTIN, and a prominent **"RECOVERY OS · ON"** badge (or "idle" when no live invoices) + demo/workspace/source chips. Right side has 4 live mini-KPIs (live invoices, claimable, recovered, §16 accruing). Bottom strip: engine label, events tracked, live-since date, as-of timestamp.
+  - **Organisation section** — supplier name, GSTIN, city, contact, data source, live-since (icon-prefixed detail rows).
+  - **Account section** — when signed in: email, name, phone, member-since + a "bcrypt-hashed · db-backed · revocable session" security note. When not signed in: a "No account linked" empty state with a "Create account" CTA.
+  - **Recovery engine section** — engine status narrative + the 5-stage pipeline distribution with bars.
+  - **KPI grid** — 4 StatCards (outstanding, §16 interest, claimable, recovered).
+  - **Top counterparty exposure** — ranked list of buyers with live/total counts + exposure.
+  - **Alert preferences** — channel chips (email/WhatsApp/SMS) + alert-trigger on/off rows + cadence/threshold summary, with an "edit →" link to settings.
+  - **Workspace activity** — events tracked, import batches, audit entries, active ODR cases.
+- Wired into the console sidebar NAV (Profile entry with UserCircle icon, right after Overview).
+- Made the sidebar org card clickable → navigates to `/console/profile`.
+- E2E: opened /console/profile → hero rendered with "RECOVERY OS · ON" badge + 4 mini-KPIs + engine status strip → organisation + account sections showed org + user details → recovery engine pipeline rendered → KPI cards + top buyers + alert prefs + activity all present. Signed up → account section showed email/name/member-since + security note. Sidebar org card click → navigated to profile. Mobile 390px responsive. Zero errors.
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 14 routes return 200 (including the new `/console/profile`)
+- `/api/profile` returns rich data: org=Shreeji, engine=on, claimable=₹1.22Cr, 5 top buyers, 34 events
+- agent-browser E2E: profile page hero with engine-on badge, org/account/engine/KPI/buyers/alerts/activity sections all render, sidebar org card clickable, mobile responsive, zero console errors
+- Artifacts: download/qa-profile-1.png through qa-profile-5-mobile.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — profile feature verified working, lint clean, zero errors
+- Recommended next-phase features:
+  1. **Profile edit** — let users edit org contact/city/GSTIN inline from the profile page
+  2. **Profile avatar upload** — let users upload a logo/avatar for the org
+  3. **Profile share** — a public read-only profile link for sharing with stakeholders
+  4. **Profile PDF export** — export the full profile as a one-page PDF
