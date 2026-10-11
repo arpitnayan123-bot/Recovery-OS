@@ -21,8 +21,6 @@ const SUGGESTIONS = [
   "What's the MSMED Act?",
 ];
 
-const SYSTEM_PROMPT = `You are Pico, the friendly mascot and guide for Recovery OS — an Indian MSME statutory-recovery fintech (MSMED Act 2006). You're a helpful cloud companion who explains the product in simple terms. Keep answers short (2-4 sentences), friendly, and grounded in the MSMED Act. You can mention: §15 (45-day payment term), §16 (compound interest at 3× bank rate), §18 (MSEFC filing), §19 (75% deposit for appeal). Be warm and conversational.`;
-
 /**
  * Pico — the always-present, draggable mascot with chat + voice.
  * Renders on every page (homepage, login, signup, console).
