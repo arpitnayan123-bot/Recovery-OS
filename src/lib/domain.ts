@@ -5,9 +5,29 @@
  */
 import { DEFAULT_BANK_RATE, statutoryInterest } from "./format";
 
-export const SUCCESS_FEE = 0.125; // 12.5% of amounts actually recovered
 export const STATUTORY_TERM_DAYS = 45;
 export const MSEFC_DECISION_DAYS = 90;
+
+/** Tiered success-fee based on invoice age at the time of engagement.
+ *  0-45 days: 8%, 46-90: 12%, 91-180: 18%, 180+: 25%, post-award enforcement: 30% */
+export function successFeeRate(daysOverdue: number, stageReached?: string): number {
+  if (stageReached === "award" || stageReached === "recovered") return 0.30; // post-award enforcement
+  if (daysOverdue <= 45) return 0.08;
+  if (daysOverdue <= 90) return 0.12;
+  if (daysOverdue <= 180) return 0.18;
+  return 0.25;
+}
+
+export const MIN_FEE = 5000; // minimum ₹5,000 per recovery
+
+/** Compute the fee for a recovered amount, tiered by invoice age. */
+export function computeFee(amount: number, daysOverdue: number, stageReached?: string): number {
+  const rate = successFeeRate(daysOverdue, stageReached);
+  return Math.max(MIN_FEE, amount * rate);
+}
+
+/** Legacy constant for backwards-compat (used in seeded data) */
+export const SUCCESS_FEE = 0.125;
 
 /* ------------------------------- stage model ------------------------------ */
 
@@ -101,7 +121,7 @@ export function buildStatutoryNotice(args: {
   const od = daysOverdue({ dueOn: args.dueOn }, now);
   const { interest, totalDue, annualPct } = statutoryInterest(args.amount, od);
 
-  const subject = `Statutory demand under Sections 15 & 16 of the Micro, Small and Medium Enterprises Development Act, 2006 — Invoice ${args.invoiceNumber}`;
+  const subject = `Statutory demand under Sections 15, 16 & 43B(h) — Invoice ${args.invoiceNumber}`;
 
   const body = [
     `To,`,
@@ -121,9 +141,11 @@ export function buildStatutoryNotice(args: {
     `      §16 interest .... Rs. ${Math.round(interest).toLocaleString("en-IN")} (${od} days, compounded monthly)`,
     `      Total payable .. Rs. ${Math.round(totalDue).toLocaleString("en-IN")}`,
     ``,
-    `4. CONSEQUENCES OF DEFAULT. In the event of continued default, the supplier shall move the Micro and Small Enterprises Facilitation Council (MSEFC) under Section 18 of the MSMED Act. Any reference is required to be decided within ninety days. Under Section 19, a buyer intending to appeal an award must first deposit seventy-five percent (75%) of the decree amount with the Council.`,
+    `4. TAX CONSEQUENCES UNDER SECTION 43B(h). Pursuant to Section 43B(h) of the Income-tax Act, 1961 (effective 1 April 2024), any payment to a micro or small enterprise that is not made within the time prescribed under the MSMED Act shall not be allowed as a deduction in the computation of business income of the buyer. The buyer is therefore liable to suffer an increased tax burden on account of this disallowance, in addition to the compound interest payable under Section 16 of the MSMED Act. We urge the buyer to remit the payment immediately to avoid this dual liability.`,
     ``,
-    `5. DEMAND. The buyer is called upon to remit Rs. ${Math.round(totalDue).toLocaleString("en-IN")}/- within fourteen (14) days of receipt of this notice, failing which recovery proceedings will be initiated at the buyer's cost, risk and consequence.`,
+    `5. CONSEQUENCES OF CONTINUED DEFAULT. In the event of continued default, the supplier shall move the Micro and Small Enterprises Facilitation Council (MSEFC) under Section 18 of the MSMED Act. Any reference is required to be decided within ninety days. Under Section 19, a buyer intending to appeal an award must first deposit seventy-five percent (75%) of the decree amount with the Council.`,
+    ``,
+    `6. DEMAND. The buyer is called upon to remit Rs. ${Math.round(totalDue).toLocaleString("en-IN")}/- within fourteen (14) days of receipt of this notice, failing which recovery proceedings will be initiated at the buyer's cost, risk and consequence, including (without limitation) filing before the MSEFC and reporting to the MSME Samadhaan portal.`,
     ``,
     `Issued by Recovery OS on behalf of the supplier, with full documentary evidence (purchase order, delivery challans, GST filings and buyer ledger) held in escrow.`,
     ``,
