@@ -242,3 +242,51 @@ This round added **3 new features** (mandatory per cron instructions):
   3. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts
   4. **Recovery forecast chart** — a recharts visualization of the 90-day projection curve on the overview (alongside the forecast card)
   5. **Invoice comparison view** — select 2-3 invoices and compare their forecast projections side-by-side
+
+---
+Task ID: 5
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 12 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview, invoices, cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous rounds' features (command palette, notifications, CSV export, animated counters, recovery forecast, PDF documents panel, settings account, bulk invoice actions, AI forecast narrative, invoice-level forecast) all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on new high-impact features from the worklog's recommended next-phase list.
+
+## Current goals/completed modifications/verification results
+This round added **2 new features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Recovery forecast chart (recharts visualization) ✅
+- Extended `/api/forecast` with a `series` field — a 31-point day-by-day projection (day 0 → day 90, step 3) of the total §16 interest accrued + total claimable, computed from the same compound-interest engine. Each point: `{ day, label, interest, total }`.
+- New component: `src/components/console/forecast-chart.tsx` — a premium recharts AreaChart with: two gradient-filled areas (§16 interest in flare/orange, total claimable in mint), a "now" reference line, hover tooltips showing exact rupee amounts, a header with 90-day-bleed + per-day stats, a legend, and a framer-motion entrance animation. Skeleton loader while fetching.
+- Wired into the overview page between the forecast card and the pipeline funnel.
+- E2E: chart renders "§16 ACCRUAL CURVE · 90-DAY PROJECTION" with the curve growing from ₹6.06L (now) to ₹11.38L (day 90), legend showing "act today → ₹X · wait 90d → ₹Y".
+
+### Feature 2 — Theme toggle (light/dark) for the console ✅
+- New `.console-light` CSS scope in globals.css — a clean light workspace palette (paper #f6f7f4 background, white cards, deep-green mint accent #0c7a4b, dark-green flare, alert red). Keeps the same accent hues as dark mode but tuned for light-surface contrast. Includes button color overrides (bg-mint buttons get light text in light mode since mint is dark green).
+- New component: `src/components/console/theme-toggle.tsx` — a Moon/Sun icon button with a colored indicator dot. Reads the persisted theme from localStorage on init (lazy useState initializer — no effect-driven setState, lint-clean), applies the `console-light` class to `<html>` + persists on change. Smooth 0.3s color transition on body.
+- Wired into the console shell topbar (both desktop + mobile), next to the notifications bell.
+- Fixed hardcoded sidebar colors (`bg-[#080a09]` → `bg-card`) so the sidebar responds to the theme.
+- E2E: clicked toggle → `<html>` gained `console-light` class → console switched to light mode (all elements rendered correctly) → clicked again → back to dark mode. Mobile light mode verified. Theme persists across reloads (localStorage).
+
+### Styling polish ✅
+- Smooth theme transitions: body + surfaces transition background-color/color over 0.3s
+- Chart entrance animation (framer-motion fade-up)
+- Theme toggle hover micro-interaction (icon scale)
+- Light-mode button contrast fixes (mint/flare CTAs get readable light text)
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- `/api/forecast` now returns `series` (31 points, ₹6.06L → ₹11.38L)
+- agent-browser E2E: forecast chart renders with curve + legend + tooltips, theme toggle switches light↔dark correctly (class applied to <html>, persists), mobile 390px light mode responsive, zero console errors
+- Artifacts: download/qa-r5-2-chart-dark.png, qa-r5-3-chart.png, qa-r5-4-light-mode.png, qa-r5-5-mobile-light.png, qa-r5-6-final-dark.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Bulk evidence pack + ODR filing** — extend the bulk API to support "seal evidence" and "file on ODR" actions (the API already accepts an `action` parameter; just add the handlers + UI buttons)
+  2. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts (ties into the reminder engine)
+  3. **Invoice comparison view** — select 2-3 invoices and compare their forecast projections side-by-side
+  4. **Theme-aware charts** — make the recharts tooltips/axis colors respond to the active theme (currently hardcoded for dark)
+  5. **Keyboard shortcuts help** — a `?` overlay showing all available shortcuts (Cmd+K, Esc, etc.)

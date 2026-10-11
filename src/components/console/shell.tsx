@@ -24,6 +24,7 @@ import {
 import { Logo } from "@/components/site/logo";
 import { CommandPalette } from "./command-palette";
 import { NotificationsBell } from "./notifications-bell";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -94,7 +95,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen lg:pl-60">
       {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-[#080a09] lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-card lg:flex">
         <SidebarContent org={org} user={authData?.user ?? null} pathname={pathname} onNavigate={() => {}} onSignOut={() => signOut.mutate()} />
       </aside>
 
@@ -113,6 +114,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span className="h-1.5 w-1.5 rounded-full bg-mint animate-pulse-dot" />
             <span className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-foreground">engine live</span>
           </div>
+          <ThemeToggle />
           <NotificationsBell />
         </div>
       </header>
@@ -123,6 +125,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <NotificationsBell />
           <button
             onClick={() => setMenuOpen(true)}
@@ -137,7 +140,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-[#080a09]">
+          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-card">
             <button
               onClick={() => setMenuOpen(false)}
               className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border"

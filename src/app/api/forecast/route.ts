@@ -108,6 +108,23 @@ export async function GET(req: Request) {
   // opportunity: if all overdue invoices were recovered today
   const totalClaimableNow = live.reduce((s, i) => s + invoiceInterest(i.amount, i.dueOn, now).totalDue, 0);
 
+  // day-by-day series for the 90-day chart (compound interest curve)
+  const series: { day: number; label: string; interest: number; total: number }[] = [];
+  for (let d = 0; d <= 90; d += 3) {
+    const future = new Date(now.getTime() + d * DAY);
+    let interestAtFuture = 0;
+    for (const inv of live) {
+      const od = daysOverdue({ dueOn: inv.dueOn }, future);
+      if (od > 0) interestAtFuture += invoiceInterest(inv.amount, inv.dueOn, future).interest;
+    }
+    series.push({
+      day: d,
+      label: d === 0 ? "now" : d === 90 ? "day 90" : `+${d}d`,
+      interest: Math.round(interestAtFuture),
+      total: Math.round(interestAtFuture + live.reduce((s, i) => s + i.amount, 0)),
+    });
+  }
+
   await audit(org.id, user?.email ?? "anonymous", "forecast.view", { liveCount: live.length, perDay });
 
   const base = {
@@ -119,6 +136,7 @@ export async function GET(req: Request) {
     perHour,
     perDay,
     projection,
+    series,
     clockRisk,
     totalClaimableNow: Math.round(totalClaimableNow),
     ninetyDayBleed: projection.find((p) => p.days === 90)?.incrementalInterest ?? 0,
