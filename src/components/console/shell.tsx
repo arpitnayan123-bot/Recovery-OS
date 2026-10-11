@@ -27,6 +27,7 @@ import { CommandPalette } from "./command-palette";
 import { NotificationsBell } from "./notifications-bell";
 import { ThemeToggle } from "./theme-toggle";
 import { ShortcutsHelp } from "./shortcuts-help";
+import { GuideAvatar } from "./guide-avatar";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { cn } from "@/lib/utils";
 
@@ -181,6 +182,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ShortcutsHelp />
+      <GuideAvatar />
     </div>
   );
 }
@@ -204,23 +206,23 @@ function SidebarContent({
         <Link href="/console" onClick={onNavigate} aria-label="Console home">
           <Logo />
         </Link>
-        <Link href="/console/profile" onClick={onNavigate} className="mt-5 block rounded-lg border border-border bg-card p-3 transition-colors hover:border-mint/30">
-          <p className="truncate font-display text-[13px] font-semibold" title={org.name}>
-            {org.name}
-          </p>
-          <p className="mt-1 truncate font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
-            {org.gstin ?? "GSTIN —"}
-          </p>
-          <div className="mt-2 flex items-center gap-1.5">
-            {org.isDemo ? (
-              <span className="rounded border border-flare/30 bg-flare/[0.08] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.14em] uppercase text-flare">
-                demo data
+        <div className="mt-5 rounded-lg border border-border bg-card p-3">
+          <Link href="/console/profile" onClick={onNavigate} className="block transition-colors hover:text-mint" title={org.name}>
+            <p className="truncate font-display text-[13px] font-semibold">{org.name}</p>
+            <p className="mt-1 truncate font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
+              {org.gstin ?? "GSTIN —"}
+            </p>
+            <div className="mt-2 flex items-center gap-1.5">
+              {org.isDemo ? (
+                <span className="rounded border border-flare/30 bg-flare/[0.08] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.14em] uppercase text-flare">
+                  demo data
+                </span>
+              ) : null}
+              <span className="rounded border border-mint/25 bg-mint/[0.07] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.14em] uppercase text-mint">
+                {org.source} sync
               </span>
-            ) : null}
-            <span className="rounded border border-mint/25 bg-mint/[0.07] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.14em] uppercase text-mint">
-              {org.source} sync
-            </span>
-          </div>
+            </div>
+          </Link>
           {user ? (
             <p className="mt-2.5 flex items-center gap-1.5 truncate border-t border-border/60 pt-2 font-mono text-[9.5px] tracking-[0.08em] text-muted-foreground" title={user.email}>
               <span className="h-1 w-1 rounded-full bg-mint" />
@@ -231,7 +233,7 @@ function SidebarContent({
               create account to keep this workspace →
             </Link>
           )}
-        </Link>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4" aria-label="Console">
