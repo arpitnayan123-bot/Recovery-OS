@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /* ============================================================
-   Recovery OS — Premium Animated Logo
-   SVG mark with gradient strokes, draw-in animation, pulsing
-   data point, shimmer sweep, and glow. Pure CSS (no JS needed).
+   Recovery OS — Premium Logo
+   The Recovery Shield: a shield silhouette (protection) with a
+   rising arrow (recovery) cut through negative space. Gradient
+   depth, glow, and refined typography. Pure SVG + CSS.
    ============================================================ */
 
 export function LogoMark({ className }: { className?: string }) {
@@ -12,111 +13,84 @@ export function LogoMark({ className }: { className?: string }) {
       viewBox="0 0 48 48"
       fill="none"
       aria-hidden="true"
-      className={cn("h-8 w-8 ros-logo-mark", className)}
+      className={cn("h-8 w-8", className)}
     >
       <defs>
-        {/* gradient for the chart line — mint to bright-green */}
-        <linearGradient id="rosLogoLine" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#2df09c" stopOpacity="0.4" />
-          <stop offset="50%" stopColor="#2df09c" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#5ffcb8" stopOpacity="1" />
+        {/* primary gradient — deep green → bright mint (bottom → top = growth direction) */}
+        <linearGradient id="rosShield" x1="0.5" y1="1" x2="0.5" y2="0">
+          <stop offset="0%" stopColor="#0c7a4b" />
+          <stop offset="40%" stopColor="#1ab87a" />
+          <stop offset="75%" stopColor="#2df09c" />
+          <stop offset="100%" stopColor="#5ffcb8" />
         </linearGradient>
-        {/* gradient for the chip border */}
-        <linearGradient id="rosLogoChip" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#2df09c" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#2df09c" stopOpacity="0.15" />
+        {/* secondary gradient — for the arrow stroke */}
+        <linearGradient id="rosArrow" x1="0.5" y1="1" x2="0.5" y2="0">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.2" />
+          <stop offset="50%" stopColor="#ffffff" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.9" />
         </linearGradient>
         {/* glow filter */}
-        <filter id="rosLogoGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
+        <filter id="rosGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.2" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        {/* clip path — so the arrow is cut from the shield (negative space) */}
+        <clipPath id="rosShieldClip">
+          {/* shield silhouette: flat top, curved sides, pointed bottom */}
+          <path d="M24 4 L40 10 L40 26 Q40 36 24 44 Q8 36 8 26 L8 10 Z" />
+        </clipPath>
       </defs>
 
-      {/* chip body — rounded square with gradient border */}
-      <rect
-        x="6"
-        y="6"
-        width="36"
-        height="36"
-        rx="11"
-        stroke="url(#rosLogoChip)"
-        strokeWidth="2"
-        fill="none"
-        className="ros-logo-chip"
-      />
-
-      {/* inner subtle fill */}
-      <rect
-        x="6"
-        y="6"
-        width="36"
-        height="36"
-        rx="11"
-        fill="#2df09c"
-        fillOpacity="0.04"
-        className="ros-logo-fill"
-      />
-
-      {/* rising chart line — draws in on mount */}
+      {/* shield body — filled with gradient */}
       <path
-        d="M13 34 L 20 26 L 25 29 L 35 16"
-        stroke="url(#rosLogoLine)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        filter="url(#rosLogoGlow)"
-        className="ros-logo-line"
+        d="M24 4 L40 10 L40 26 Q40 36 24 44 Q8 36 8 26 L8 10 Z"
+        fill="url(#rosShield)"
+        filter="url(#rosGlow)"
+        className="ros-shield-body"
       />
 
-      {/* arrow tip — subtle pulse */}
-      <path
-        d="M 28.5 17 L 35 16 L 33.5 22.5"
-        stroke="url(#rosLogoLine)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        filter="url(#rosLogoGlow)"
-        className="ros-logo-arrow"
-      />
-
-      {/* starting data point — pulsing dot */}
-      <circle cx="13" cy="34" r="2.2" fill="#2df09c" className="ros-logo-dot" />
-      {/* ending data point — peak */}
-      <circle cx="35" cy="16" r="2.5" fill="#5ffcb8" filter="url(#rosLogoGlow)" className="ros-logo-dot-peak" />
-
-      {/* shimmer sweep overlay */}
-      <rect
-        x="6"
-        y="6"
-        width="36"
-        height="36"
-        rx="11"
-        fill="white"
-        fillOpacity="0"
-        className="ros-logo-shimmer"
-      >
-        <animate
-          attributeName="fill-opacity"
-          values="0;0;0.06;0.06;0"
-          keyTimes="0;0.3;0.5;0.7;1"
-          dur="4s"
-          repeatCount="indefinite"
+      {/* rising arrow — cut from the shield using negative space (overlay in bg color) */}
+      <g clipPath="url(#rosShieldClip)">
+        {/* arrow shaft + head */}
+        <path
+          d="M24 36 L24 14 M24 14 L18 20 M24 14 L30 20"
+          stroke="url(#rosArrow)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          className="ros-shield-arrow"
         />
-      </rect>
+      </g>
+
+      {/* subtle inner highlight — top edge of shield */}
+      <path
+        d="M24 4 L40 10"
+        stroke="rgba(255,255,255,0.25)"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M24 4 L8 10"
+        stroke="rgba(255,255,255,0.15)"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+
+      {/* top vertex glow dot */}
+      <circle cx="24" cy="4" r="1" fill="#5ffcb8" filter="url(#rosGlow)" className="ros-shield-vertex" />
     </svg>
   );
 }
 
 /**
- * Full logo: animated mark + "Recovery" wordmark with gradient + "OS" badge.
+ * Full logo: premium shield mark + "Recovery OS" wordmark.
+ * No badge box — clean typography with gradient + letter-spacing.
  * tone="auto"   — follows theme tokens
- * tone="bright" — hard bright-mint for dark surfaces
+ * tone="bright" — bright mint for dark surfaces
  */
 export function Logo({
   className,
@@ -129,26 +103,20 @@ export function Logo({
   compact?: boolean;
   tone?: "auto" | "bright";
 }) {
-  const accent = tone === "bright" ? "text-[#3df0a0]" : "text-mint";
-  const badge =
-    tone === "bright"
-      ? "text-[#3df0a0] border-[#3df0a0]/35"
-      : "text-mint border-mint/35";
+  const textColor = tone === "bright" ? "text-[#3df0a0]" : "text-mint";
 
   return (
-    <span className={cn("inline-flex items-center gap-2.5 select-none", className)}>
-      <LogoMark className={cn(accent, markClassName)} />
+    <span className={cn("inline-flex items-center gap-2 select-none", className)}>
+      <LogoMark className={cn("shrink-0", markClassName)} />
       {!compact && (
-        <span className="flex items-baseline gap-1.5">
-          <span className="ros-logo-wordmark font-display text-[1.15rem] font-semibold tracking-tight text-current">
+        <span className="flex items-baseline gap-[3px]">
+          <span className="ros-wordmark font-display text-[1.1rem] font-semibold tracking-[-0.03em] text-current">
             Recovery
           </span>
-          <span
-            className={cn(
-              "ros-logo-badge font-mono text-[0.72rem] font-medium border rounded-md px-1.5 py-0.5 leading-none translate-y-[-1px]",
-              badge
-            )}
-          >
+          <span className={cn(
+            "font-display text-[1.1rem] font-medium tracking-[0.04em]",
+            textColor,
+          )}>
             OS
           </span>
         </span>
