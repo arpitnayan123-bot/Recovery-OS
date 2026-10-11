@@ -97,35 +97,88 @@ export function Nav() {
             </span>
           </Link>
 
-          {/* hamburger — the only control on the bar */}
-          <button
-            onClick={() => setOpen((v) => !v)}
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            className={cn(
-              "group relative flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300",
-              open
-                ? "border-white/25 bg-white/[0.06] text-white hover:bg-white/[0.12]"
-                : pastHero
-                  ? "border-ink/15 bg-ink/[0.04] text-ink hover:border-ink/40 hover:bg-ink/[0.08]"
-                  : "border-white/30 bg-white/[0.08] text-white backdrop-blur-md hover:bg-white/[0.16]"
+          {/* visible CTAs — Sign in + Start recovery, always on the bar */}
+          <div className="flex items-center gap-2.5">
+            {/* Sign in (hidden when menu open or when already signed in) */}
+            {!open && !user && (
+              <Link
+                href="/login"
+                className={cn(
+                  "hidden items-center gap-1.5 rounded-full border px-4 h-9 text-[12px] font-medium transition-all duration-300 sm:inline-flex",
+                  pastHero
+                    ? "border-ink/15 bg-ink/[0.04] text-ink hover:border-ink/40 hover:bg-ink/[0.08]"
+                    : "border-white/30 bg-white/[0.08] text-white backdrop-blur-md hover:bg-white/[0.16]",
+                )}
+              >
+                <LogIn className="h-3.5 w-3.5" /> Sign in
+              </Link>
             )}
-          >
-            <span className="relative block h-3 w-[18px]">
-              <span
-                className={cn(
-                  "absolute left-0 top-0 block h-[1.5px] w-full rounded-full bg-current transition-all duration-300",
-                  open && "top-[5.5px] rotate-45"
-                )}
-              />
-              <span
-                className={cn(
-                  "absolute bottom-0 left-0 block h-[1.5px] w-full rounded-full bg-current transition-all duration-300",
-                  open && "bottom-[5.5px] -rotate-45"
-                )}
-              />
-            </span>
-          </button>
+            {/* signed-in badge + sign out */}
+            {!open && user && (
+              <div className="hidden items-center gap-2.5 sm:flex">
+                <span className={cn(
+                  "font-mono text-[10px] uppercase tracking-[0.14em]",
+                  pastHero ? "text-ink/55" : "text-white/55",
+                )}>
+                  {user.email}
+                </span>
+                <button
+                  onClick={async () => {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                    setUser(null);
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3.5 h-9 text-[12px] font-medium transition-all duration-300",
+                    pastHero
+                      ? "border-ink/15 bg-ink/[0.04] text-ink hover:border-ink/40 hover:bg-ink/[0.08]"
+                      : "border-white/30 bg-white/[0.08] text-white backdrop-blur-md hover:bg-white/[0.16]",
+                  )}
+                >
+                  <LogOut className="h-3.5 w-3.5" /> Sign out
+                </button>
+              </div>
+            )}
+            {/* Start recovery — primary CTA (hidden when menu open) */}
+            {!open && (
+              <Link
+                href="/onboarding"
+                className="btn-mint hidden h-9 items-center gap-1.5 px-4 text-[12px] sm:inline-flex"
+              >
+                Start recovery
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+
+            {/* hamburger — opens the full menu */}
+            <button
+              onClick={() => setOpen((v) => !v)}
+              aria-label={open ? "Close menu" : "Open menu"}
+              aria-expanded={open}
+              className={cn(
+                "group relative flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300",
+                open
+                  ? "border-white/25 bg-white/[0.06] text-white hover:bg-white/[0.12]"
+                  : pastHero
+                    ? "border-ink/15 bg-ink/[0.04] text-ink hover:border-ink/40 hover:bg-ink/[0.08]"
+                    : "border-white/30 bg-white/[0.08] text-white backdrop-blur-md hover:bg-white/[0.16]"
+              )}
+            >
+              <span className="relative block h-3 w-[18px]">
+                <span
+                  className={cn(
+                    "absolute left-0 top-0 block h-[1.5px] w-full rounded-full bg-current transition-all duration-300",
+                    open && "top-[5.5px] rotate-45"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "absolute bottom-0 left-0 block h-[1.5px] w-full rounded-full bg-current transition-all duration-300",
+                    open && "bottom-[5.5px] -rotate-45"
+                  )}
+                />
+              </span>
+            </button>
+          </div>
         </nav>
       </motion.header>
 
