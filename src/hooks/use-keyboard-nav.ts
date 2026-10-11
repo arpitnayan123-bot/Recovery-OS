@@ -49,6 +49,12 @@ export function useKeyboardNav(enabled: boolean = true) {
         e.preventDefault();
         router.push(GOTO[e.key]);
         reset();
+        return;
+      }
+      // `e` — explain the forecast in plain English (AI narrative)
+      if (!prefix && e.key === "e") {
+        window.dispatchEvent(new CustomEvent("ros:explain-forecast"));
+        return;
       }
     };
 

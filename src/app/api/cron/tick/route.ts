@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
-import { prisma, buildStatutoryNotice, daysOverdue, invoiceInterest } from "@/lib/recovery";
+import { prisma, buildStatutoryNotice, daysOverdue, invoiceInterest, MSEFC_DECISION_DAYS } from "@/lib/recovery";
 import { audit, AUDIT } from "@/lib/auth";
+
+const DAY = 86_400_000;
 
 /**
  * GET/POST /api/cron/tick?secret=...
- * The reminder engine. Scans every org for invoices whose §15 term has
- * just broken and queues the multi-channel reminder ladder (email →
- * WhatsApp → SMS → rPAD). Idempotent: an invoice already in 'reminder_sent'
- * or beyond is skipped. In production this is hit every 15 minutes by a
- * scheduler; here it also runs from the console "Run reminder tick" button.
+ * The reminder engine. Scans every org for:
+ *  1. Invoices whose §15 term has just broken (watch + overdue) → auto-serve
+ *     the statutory ladder (email + WhatsApp), respecting DigestPreference
+ *     channel toggles and the alertOverdue trigger.
+ *  2. ODR cases approaching the 90-day MSEFC decision deadline (≤14 days) →
+ *     queue a hearing reminder if alertClockRisk is on.
+ *
+ * Idempotent: an invoice already past 'watch' or with a statutory reminder
+ * already queued is skipped. Respects per-org digest preferences — a channel
+ * disabled in settings is never queued for that org.
  */
-const REMINDER_LADDER = [
-  { channel: "email", kind: "pre_45", offset: 0, subject: "Reminder — invoice approaching the 45-day term", body: "Friendly heads-up: this invoice is approaching the statutory 45-day payment term under §15 of the MSMED Act, 2006. Please remit before the term expires to avoid §16 compound interest." },
-  { channel: "email", kind: "statutory", offset: 1, subject: "", body: "" }, // filled from buildStatutoryNotice
-  { channel: "whatsapp", kind: "escalation", offset: 0, subject: "Escalation — statutory demand served", body: "A statutory demand under §16 of the MSMED Act has been served. Please contact us immediately to settle." },
-  { channel: "sms", kind: "hearing", offset: 0, subject: "MSEFC hearing scheduled", body: "Your ODR reference has been admitted. Hearing details to follow." },
-];
+const WHATSAPP_ESCALATION = {
+  subject: "Escalation — statutory demand served",
+  body: "A statutory demand under §16 of the MSMED Act has been served. Please contact us immediately to settle.",
+};
+const SMS_HEARING = {
+  subject: "MSEFC hearing reminder",
+  body: "Your ODR reference is approaching the 90-day decision deadline. Ensure your evidence is on record.",
+};
 
 async function runTick() {
   const orgs = await prisma.org.findMany({ select: { id: true, name: true } });
@@ -23,65 +32,115 @@ async function runTick() {
   let scanned = 0;
   let queued = 0;
   let promoted = 0;
-  const perOrg: { org: string; queued: number; promoted: number }[] = [];
+  let clockAlerts = 0;
+  const perOrg: { org: string; queued: number; promoted: number; clockAlerts: number }[] = [];
 
   for (const org of orgs) {
+    // load this org's digest preferences (or defaults)
+    const prefs = await prisma.digestPreference.findUnique({ where: { orgId: org.id } });
+    const emailOn = prefs?.emailEnabled ?? true;
+    const whatsappOn = prefs?.whatsappEnabled ?? false;
+    const smsOn = prefs?.smsEnabled ?? false;
+    const alertOverdue = prefs?.alertOverdue ?? true;
+    const alertClockRisk = prefs?.alertClockRisk ?? true;
+
     let orgQueued = 0;
     let orgPromoted = 0;
-    // invoices still in 'watch' that have crossed day 45 → auto-serve statutory ladder
-    const dueWatch = await prisma.invoice.findMany({
-      where: { orgId: org.id, status: "watch" },
-      include: { buyer: true },
-    });
-    for (const inv of dueWatch) {
-      scanned++;
-      const od = daysOverdue({ dueOn: inv.dueOn }, now);
-      if (od <= 0) continue;
-      // has a statutory reminder already been queued for this invoice?
-      const existing = await prisma.reminder.findFirst({
-        where: { invoiceId: inv.id, kind: "statutory" },
-      });
-      if (existing) continue;
+    let orgClockAlerts = 0;
 
-      const notice = buildStatutoryNotice({
-        supplierName: org.name,
-        buyerName: inv.buyer.name,
-        invoiceNumber: inv.number,
-        amount: inv.amount,
-        issuedOn: inv.issuedOn,
-        dueOn: inv.dueOn,
-        now,
+    // 1. overdue watch invoices → statutory ladder
+    if (alertOverdue) {
+      const dueWatch = await prisma.invoice.findMany({
+        where: { orgId: org.id, status: "watch" },
+        include: { buyer: true },
       });
-      await prisma.reminder.create({
-        data: { invoiceId: inv.id, channel: "email", kind: "statutory", subject: notice.subject, body: notice.body, status: "queued" },
-      });
-      await prisma.reminder.create({
-        data: { invoiceId: inv.id, channel: "whatsapp", kind: "escalation", subject: REMINDER_LADDER[2].subject, body: REMINDER_LADDER[2].body, status: "queued" },
-      });
-      // promote invoice to reminder_sent so the pipeline reflects reality
-      await prisma.invoice.update({ where: { id: inv.id }, data: { status: "reminder_sent" } });
-      await prisma.event.create({
-        data: { orgId: org.id, invoiceId: inv.id, type: "notice", title: `Reminder tick: statutory demand queued for ${inv.buyer.name}`, detail: `Auto-detected day-${od} default · email + WhatsApp queued · ₹${Math.round(notice.totalDue).toLocaleString("en-IN")} claimable` },
-      });
-      orgQueued += 2;
-      orgPromoted++;
-      queued += 2;
-      promoted++;
+      for (const inv of dueWatch) {
+        scanned++;
+        const od = daysOverdue({ dueOn: inv.dueOn }, now);
+        if (od <= 0) continue;
+        const existing = await prisma.reminder.findFirst({
+          where: { invoiceId: inv.id, kind: "statutory" },
+        });
+        if (existing) continue;
+
+        const notice = buildStatutoryNotice({
+          supplierName: org.name,
+          buyerName: inv.buyer.name,
+          invoiceNumber: inv.number,
+          amount: inv.amount,
+          issuedOn: inv.issuedOn,
+          dueOn: inv.dueOn,
+          now,
+        });
+
+        // queue email (if enabled)
+        if (emailOn) {
+          await prisma.reminder.create({
+            data: { invoiceId: inv.id, channel: "email", kind: "statutory", subject: notice.subject, body: notice.body, status: "queued" },
+          });
+          orgQueued++;
+        }
+        // queue WhatsApp escalation (if enabled)
+        if (whatsappOn) {
+          await prisma.reminder.create({
+            data: { invoiceId: inv.id, channel: "whatsapp", kind: "escalation", subject: WHATSAPP_ESCALATION.subject, body: WHATSAPP_ESCALATION.body, status: "queued" },
+          });
+          orgQueued++;
+        }
+        // promote invoice to reminder_sent
+        await prisma.invoice.update({ where: { id: inv.id }, data: { status: "reminder_sent" } });
+        await prisma.event.create({
+          data: { orgId: org.id, invoiceId: inv.id, type: "notice", title: `Reminder tick: statutory demand queued for ${inv.buyer.name}`, detail: `Auto-detected day-${od} default · ${emailOn ? "email" : ""}${emailOn && whatsappOn ? " + " : ""}${whatsappOn ? "WhatsApp" : ""} queued · ₹${Math.round(notice.totalDue).toLocaleString("en-IN")} claimable` },
+        });
+        orgPromoted++;
+      }
     }
-    if (orgQueued > 0) perOrg.push({ org: org.name, queued: orgQueued, promoted: orgPromoted });
+
+    // 2. MSEFC clock risk — cases ≤14 days from the decision deadline
+    if (alertClockRisk) {
+      const activeCases = await prisma.case.findMany({
+        where: { orgId: org.id, stage: { not: "award" } },
+        include: { invoice: { include: { buyer: true } } },
+      });
+      for (const c of activeCases) {
+        const decisionBy = new Date(c.filedOn.getTime() + MSEFC_DECISION_DAYS * DAY);
+        const daysLeft = Math.ceil((decisionBy.getTime() - now.getTime()) / DAY);
+        if (daysLeft > 14 || daysLeft < 0) continue;
+        // have we already queued a hearing reminder for this case?
+        const existingHearing = await prisma.reminder.findFirst({
+          where: { invoiceId: c.invoiceId, kind: "hearing" },
+        });
+        if (existingHearing) continue;
+
+        const channel = smsOn ? "sms" : emailOn ? "email" : whatsappOn ? "whatsapp" : null;
+        if (!channel) continue;
+        await prisma.reminder.create({
+          data: { invoiceId: c.invoiceId, channel, kind: "hearing", subject: SMS_HEARING.subject, body: `${SMS_HEARING.body} Case ${c.caseNumber} — ${daysLeft} days left to the §18 decision deadline.`, status: "queued" },
+        });
+        await prisma.event.create({
+          data: { orgId: org.id, invoiceId: c.invoiceId, type: "system", title: `MSEFC clock alert — ${c.caseNumber}`, detail: `${daysLeft} days to decision deadline (§18). ${channel} reminder queued to ${c.invoice.buyer.name}.` },
+        });
+        orgClockAlerts++;
+      }
+    }
+
+    if (orgQueued > 0 || orgClockAlerts > 0) {
+      perOrg.push({ org: org.name, queued: orgQueued, promoted: orgPromoted, clockAlerts: orgClockAlerts });
+    }
+    queued += orgQueued;
+    promoted += orgPromoted;
+    clockAlerts += orgClockAlerts;
   }
 
-  // best-effort audit against the first org (cron is cross-org)
-  if (orgs[0]) await audit(orgs[0].id, "system", AUDIT.CRON_TICK, { scanned, queued, promoted, orgs: orgs.length });
+  if (orgs[0]) await audit(orgs[0].id, "system", AUDIT.CRON_TICK, { scanned, queued, promoted, clockAlerts, orgs: orgs.length });
 
-  return { scanned, queued, promoted, perOrg, ranAt: now.toISOString() };
+  return { scanned, queued, promoted, clockAlerts, perOrg, ranAt: now.toISOString() };
 }
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const secret = url.searchParams.get("secret");
   const expected = process.env.CRON_SECRET;
-  // if a secret is configured, require it; otherwise allow (sandbox/dev)
   if (expected && secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

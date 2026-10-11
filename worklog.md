@@ -430,3 +430,46 @@ This round added **2 new features + styling polish** (mandatory per cron instruc
   3. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
   4. **Bulk action progress** — for 50+ invoices, show a live progress bar instead of a single spinner
   5. **Theme-aware comparison chart** — apply useChartTheme to the invoice-comparison LineChart
+
+---
+Task ID: 9
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 16 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview, invoices (bulk + comparison), cases, buyers, insights, analytics, activity, audit, settings (with digest preferences), signup, login, homepage all render without errors. Previous rounds' features all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on the top 3 recommendations: wire digest preferences into the reminder engine, theme-aware comparison chart, and the `e` shortcut for AI narrative.
+
+## Current goals/completed modifications/verification results
+This round added **3 new features** (mandatory per cron instructions):
+
+### Feature 1 — Wire digest preferences into the cron/tick reminder engine (top recommendation) ✅
+- Rewrote `/api/cron/tick` to respect per-org `DigestPreference` settings: only queues email reminders if `emailEnabled`, only WhatsApp escalations if `whatsappEnabled`, only runs overdue detection if `alertOverdue`, and adds a new MSEFC clock-risk alert path (cases ≤14 days from the §18 decision deadline → queue hearing reminder via the first enabled channel: SMS → email → WhatsApp) if `alertClockRisk`. Defaults to enabled when no prefs row exists.
+- Each reminder includes the right channel + kind + body, and creates an event documenting which channel was used.
+- E2E: cron/tick → `{scanned:30, queued:13, promoted:13, clockAlerts:0, perOrg:13}` — correctly scanned all invoices, queued reminders respecting channel prefs, ran the clock-risk check (found 0 critical cases).
+
+### Feature 2 — Theme-aware comparison chart ✅
+- Updated `invoice-comparison.tsx` to use the shared `useChartTheme()` helper — the multi-line LineChart's axis text, grid lines, tooltips, and legend now adapt to the active console theme. Removed the hardcoded `tooltipStyle`/`axisStyle` constants.
+- E2E: opened comparison in light mode → chart rendered with light axis/grid/tooltip colors → winner callout showed correctly ("ORBT/2231 is bleeding the fastest — ₹1,09,168 over 90 days. Recover it first.") → zero errors.
+
+### Feature 3 — `e` shortcut for AI forecast narrative ✅
+- Extended `use-keyboard-nav.ts` to dispatch a `ros:explain-forecast` custom event when the `e` key is pressed (respects input-typing + modifier-key guards, only fires when not in `g`-prefix mode).
+- Updated `forecast-card.tsx` to listen for the `ros:explain-forecast` event and trigger the `fetchNarrative()` AI call — the `e` shortcut now actually triggers the "Explain in plain English" AI narrative that's listed in the keyboard shortcuts help.
+- E2E: pressed `e` on the overview → after ~20s, the AI narrative rendered: "Inaction is costing you ₹531,496 over 90 days and ₹12,191,696 total claimable now, with invoice NSR/2026/1102 (Northstar Retail India Ltd) being your biggest leak at ₹299,962 in current interest." — grounded in real portfolio data.
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- cron/tick verified: respects digest preferences, returns correct counts
+- agent-browser E2E: cron/tick with prefs, comparison chart in light mode, `e` shortcut triggers AI narrative, theme toggle works, mobile 390px responsive, zero console errors
+- Artifacts: download/qa-r9-1-final.png, qa-r9-2-mobile.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
+  2. **Bulk action progress** — for 50+ invoices, show a live progress bar instead of a single spinner
+  3. **Email digest test send** — a "send test alert" button on the settings page that triggers a sample reminder through the enabled channels
+  4. **Forecast threshold alert** — wire the forecastThreshold from DigestPreference into the cron/tick so it queues an alert when the daily §16 bleed exceeds the threshold
+  5. **Keyboard shortcut for bulk action** — `b` to open the bulk action dialog when invoices are selected

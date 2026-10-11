@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { TrendingDown, Clock, AlertTriangle, ArrowRight, Zap, Sparkles, Loader2 } from "lucide-react";
@@ -63,6 +63,13 @@ export function ForecastCard() {
       setNarrativeLoading(false);
     }
   };
+
+  // listen for the `e` keyboard shortcut to trigger the AI narrative
+  useEffect(() => {
+    const handler = () => { if (!narrativeLoading && !narrative) fetchNarrative(); };
+    window.addEventListener("ros:explain-forecast", handler);
+    return () => window.removeEventListener("ros:explain-forecast", handler);
+  }, [narrativeLoading, narrative]);
 
   if (isLoading || !data) {
     return (

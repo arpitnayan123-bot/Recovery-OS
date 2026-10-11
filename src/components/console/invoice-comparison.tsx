@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { GitCompare, X, TrendingUp, Clock, IndianRupee } from "lucide-react";
 import { inrCompact, StatusChip } from "@/components/console/kit";
+import { useChartTheme } from "@/components/console/chart-theme";
 import { inr } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -27,18 +28,6 @@ type ComparisonItem = {
 };
 
 const COLORS = ["#2df09c", "#f5b02e", "#f9774d", "#7dd3fc"];
-const COLOR_NAMES = ["mint", "flare", "alert", "cyan"];
-
-const tooltipStyle = {
-  background: "rgba(11,14,12,0.95)",
-  border: "1px solid rgba(45,240,156,0.22)",
-  borderRadius: "8px",
-  color: "#ecefe9",
-  fontFamily: "var(--font-inter)",
-  fontSize: "12px",
-  padding: "8px 12px",
-};
-const axisStyle = { fontSize: 10, fill: "rgba(236,239,233,0.55)", fontFamily: "var(--font-mono)" };
 
 function shortInr(v: number) {
   if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
@@ -48,6 +37,7 @@ function shortInr(v: number) {
 }
 
 export function InvoiceComparison({ ids, onClose }: { ids: string[]; onClose: () => void }) {
+  const ct = useChartTheme();
   const { data, isLoading } = useQuery<{ comparison: ComparisonItem[] }>({
     queryKey: ["compare", ids.join(",")],
     queryFn: async () => (await fetch(`/api/invoices/compare?ids=${ids.join(",")}`)).json(),
@@ -119,11 +109,11 @@ export function InvoiceComparison({ ids, onClose }: { ids: string[]; onClose: ()
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={merged} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(236,239,233,0.06)" vertical={false} />
-                <XAxis dataKey="day" tickFormatter={(d) => d === 0 ? "now" : `+${d}d`} tick={axisStyle} tickLine={false} axisLine={{ stroke: "rgba(236,239,233,0.1)" }} />
-                <YAxis tickFormatter={shortInr} tick={axisStyle} tickLine={false} axisLine={false} width={52} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [shortInr(v), `${n} interest`]} labelFormatter={(l) => `day ${l}`} />
-                <Legend wrapperStyle={{ fontSize: 10, fontFamily: "var(--font-mono)" }} iconType="plainline" />
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+                <XAxis dataKey="day" tickFormatter={(d) => d === 0 ? "now" : `+${d}d`} tick={ct.axis} tickLine={false} axisLine={{ stroke: ct.axisLine }} />
+                <YAxis tickFormatter={shortInr} tick={ct.axis} tickLine={false} axisLine={false} width={52} />
+                <Tooltip contentStyle={ct.tooltip} formatter={(v: number, n: string) => [shortInr(v), `${n} interest`]} labelFormatter={(l) => `day ${l}`} />
+                <Legend wrapperStyle={ct.legend} iconType="plainline" />
                 {items.map((item, idx) => (
                   <Line
                     key={item.id}
