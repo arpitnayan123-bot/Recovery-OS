@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { TrendingUp } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 type Series = { day: number; label: string; interest: number; total: number };
@@ -15,16 +16,25 @@ type ForecastData = {
   totalClaimableNow: number;
 };
 
-const tooltipStyle = {
-  background: "rgba(11,14,12,0.95)",
-  border: "1px solid rgba(45,240,156,0.22)",
-  borderRadius: "8px",
-  color: "#ecefe9",
-  fontFamily: "var(--font-inter)",
-  fontSize: "12px",
-  padding: "8px 12px",
-};
-const axisStyle = { fontSize: 10, fill: "rgba(236,239,233,0.55)", fontFamily: "var(--font-mono)" };
+function useChartTheme() {
+  const theme = useTheme();
+  const isLight = theme === "light";
+  return {
+    tooltip: {
+      background: isLight ? "rgba(255,255,255,0.97)" : "rgba(11,14,12,0.95)",
+      border: isLight ? "1px solid rgba(12,122,75,0.25)" : "1px solid rgba(45,240,156,0.22)",
+      borderRadius: "8px",
+      color: isLight ? "#0e1410" : "#ecefe9",
+      fontFamily: "var(--font-inter)",
+      fontSize: "12px",
+      padding: "8px 12px",
+    } as const,
+    axis: { fontSize: 10, fill: isLight ? "rgba(14,20,16,0.55)" : "rgba(236,239,233,0.55)", fontFamily: "var(--font-mono)" } as const,
+    grid: isLight ? "rgba(14,20,16,0.08)" : "rgba(236,239,233,0.06)",
+    axisLine: isLight ? "rgba(14,20,16,0.12)" : "rgba(236,239,233,0.1)",
+    refLine: isLight ? "rgba(12,122,75,0.3)" : "rgba(45,240,156,0.3)",
+  };
+}
 
 function shortInr(v: number) {
   if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
@@ -39,6 +49,7 @@ export function ForecastChart({ compact = false }: { compact?: boolean }) {
     queryFn: async () => (await fetch("/api/forecast")).json(),
     staleTime: 30_000,
   });
+  const ct = useChartTheme();
 
   if (isLoading || !data || data.series.length === 0) {
     return (
@@ -98,17 +109,17 @@ export function ForecastChart({ compact = false }: { compact?: boolean }) {
                 <stop offset="100%" stopColor="#2df09c" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(236,239,233,0.06)" vertical={false} />
-            <XAxis dataKey="label" tick={axisStyle} tickLine={false} axisLine={{ stroke: "rgba(236,239,233,0.1)" }} interval={3} />
-            <YAxis tickFormatter={shortInr} tick={axisStyle} tickLine={false} axisLine={false} width={52} />
+            <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+            <XAxis dataKey="label" tick={ct.axis} tickLine={false} axisLine={{ stroke: ct.axisLine }} interval={3} />
+            <YAxis tickFormatter={shortInr} tick={ct.axis} tickLine={false} axisLine={false} width={52} />
             <Tooltip
-              contentStyle={tooltipStyle}
+              contentStyle={ct.tooltip}
               formatter={(v: number, n: string) => [shortInr(v), n === "interest" ? "§16 interest" : "total claimable"]}
               labelFormatter={(l) => `day ${l}`}
             />
             <Area type="monotone" dataKey="total" stroke="#2df09c" strokeWidth={1.5} fill="url(#gForecastTotal)" />
             <Area type="monotone" dataKey="interest" stroke="#f9774d" strokeWidth={2} fill="url(#gForecastInterest)" />
-            <ReferenceLine x="now" stroke="rgba(45,240,156,0.3)" strokeDasharray="2 4" />
+            <ReferenceLine x="now" stroke={ct.refLine} strokeDasharray="2 4" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

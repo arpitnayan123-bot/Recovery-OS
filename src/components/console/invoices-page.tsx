@@ -122,7 +122,7 @@ export default function InvoicesPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-flare/40 bg-flare/[0.08] px-4 h-10 text-[13px] font-medium text-flare transition-colors hover:bg-flare/[0.14]"
           >
             <SendBulk className="h-4 w-4" />
-            Bulk serve
+            Bulk action
             <span className="rounded border border-flare/30 bg-flare/10 px-1.5 py-0.5 font-mono text-[9px] tabular-nums">{bulkEligible.length}</span>
           </button>
         )}
@@ -193,7 +193,7 @@ export default function InvoicesPage() {
                 onClick={() => setBulkOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-flare px-3 h-8 text-[11.5px] font-semibold text-[#1a1305] transition-colors hover:bg-[#ffc555]"
               >
-                <SendBulk className="h-3.5 w-3.5" /> Serve {selectedEligible.length} demand{selectedEligible.length === 1 ? "" : "s"}
+                <SendBulk className="h-3.5 w-3.5" /> Bulk action · {selectedEligible.length}
               </button>
             )}
           </div>
@@ -410,6 +410,14 @@ function AddInvoiceDialog({ onClose, onAdded }: { onClose: () => void; onAdded: 
 
 /* ----------------------------- bulk serve dialog ----------------------------- */
 
+type BulkAction = "remind" | "evidence" | "file";
+
+const ACTION_META: Record<BulkAction, { label: string; verb: string; desc: string; color: string; icon: any }> = {
+  remind: { label: "Serve demand", verb: "served", desc: "§15/§16 statutory notice on every overdue watch invoice", color: "flare", icon: SendBulk },
+  evidence: { label: "Seal evidence", verb: "sealed", desc: "5-document evidence pack on every notice-served invoice", color: "mint", icon: FolderCheck },
+  file: { label: "File on ODR", verb: "filed", desc: "MSEFC reference on every evidence-ready invoice (90-day clock)", color: "mint", icon: Scale },
+};
+
 function BulkServeDialog({
   invoices,
   onClose,
@@ -420,15 +428,16 @@ function BulkServeDialog({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [results, setResults] = useState<null | { id: string; number: string; buyer: string; status: "served" | "skipped" | "not_overdue"; reason?: string }[]>(null);
-  const [summary, setSummary] = useState<{ total: number; served: number; skipped: number; notOverdue: number } | null>(null);
+  const [action, setAction] = useState<BulkAction>("remind");
+  const [results, setResults] = useState<null | { id: string; number: string; buyer: string; status: "done" | "skipped" | "not_ready"; reason?: string }[]>(null);
+  const [summary, setSummary] = useState<{ total: number; done: number; skipped: number; notReady: number } | null>(null);
 
   const run = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/invoices/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: invoices.map((i) => i.id), action: "remind" }),
+        body: JSON.stringify({ ids: invoices.map((i) => i.id), action }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Bulk action failed");
@@ -441,23 +450,26 @@ function BulkServeDialog({
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["forecast"] });
+      qc.invalidateQueries({ queryKey: ["cases"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const totalClaim = invoices.reduce((s, i) => s + i.claimable, 0);
+  const meta = ACTION_META[action];
+  const Icon = meta.icon;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-xl border border-border bg-[#0b0e0c] p-6">
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-flare/30 bg-flare/[0.08] text-flare">
-            <SendBulk className="h-4 w-4" />
+          <span className={cn("inline-flex h-9 w-9 items-center justify-center rounded-lg border", meta.color === "flare" ? "border-flare/30 bg-flare/[0.08] text-flare" : "border-mint/30 bg-mint/[0.08] text-mint")}>
+            <Icon className="h-4 w-4" />
           </span>
           <div>
-            <h3 className="font-display text-lg font-semibold tracking-tight">Bulk serve statutory demand</h3>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">§15/§16 notices served on every selected overdue invoice in one action.</p>
+            <h3 className="font-display text-lg font-semibold tracking-tight">Bulk pipeline action</h3>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">Run one recovery stage across {invoices.length} invoice{invoices.length === 1 ? "" : "s"} at once.</p>
           </div>
         </div>
 
@@ -470,16 +482,16 @@ function BulkServeDialog({
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded border border-mint/30 bg-mint/[0.06] py-2">
-                  <p className="font-display text-xl font-semibold text-mint tabular-nums">{summary?.served ?? 0}</p>
-                  <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-muted-foreground">served</p>
+                  <p className="font-display text-xl font-semibold text-mint tabular-nums">{summary?.done ?? 0}</p>
+                  <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-muted-foreground">{meta.verb}</p>
                 </div>
                 <div className="rounded border border-flare/30 bg-flare/[0.06] py-2">
                   <p className="font-display text-xl font-semibold text-flare tabular-nums">{summary?.skipped ?? 0}</p>
                   <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-muted-foreground">skipped</p>
                 </div>
                 <div className="rounded border border-border bg-secondary/40 py-2">
-                  <p className="font-display text-xl font-semibold tabular-nums text-muted-foreground">{summary?.notOverdue ?? 0}</p>
-                  <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-muted-foreground">in term</p>
+                  <p className="font-display text-xl font-semibold tabular-nums text-muted-foreground">{summary?.notReady ?? 0}</p>
+                  <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-muted-foreground">not ready</p>
                 </div>
               </div>
             </div>
@@ -489,15 +501,15 @@ function BulkServeDialog({
                   <li key={r.id} className="flex items-center gap-3 px-3 py-2 text-[12px]">
                     <span className={cn(
                       "h-1.5 w-1.5 shrink-0 rounded-full",
-                      r.status === "served" ? "bg-mint" : r.status === "skipped" ? "bg-flare" : "bg-muted-foreground",
+                      r.status === "done" ? "bg-mint" : r.status === "skipped" ? "bg-flare" : "bg-muted-foreground",
                     )} />
                     <span className="font-mono text-[10.5px] text-muted-foreground">{r.number}</span>
                     <span className="truncate">{r.buyer}</span>
                     <span className={cn(
                       "ml-auto font-mono text-[9px] tracking-[0.1em] uppercase",
-                      r.status === "served" ? "text-mint" : "text-muted-foreground",
+                      r.status === "done" ? "text-mint" : "text-muted-foreground",
                     )}>
-                      {r.status === "served" ? "served" : r.reason}
+                      {r.status === "done" ? meta.verb : r.reason}
                     </span>
                   </li>
                 ))}
@@ -509,14 +521,38 @@ function BulkServeDialog({
           </div>
         ) : (
           <>
-            <div className="mt-5 rounded-lg border border-border bg-secondary/20 p-4">
-              <p className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-foreground">You are about to serve</p>
+            {/* action selector */}
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {(Object.keys(ACTION_META) as BulkAction[]).map((a) => {
+                const m = ACTION_META[a];
+                const MIcon = m.icon;
+                return (
+                  <button
+                    key={a}
+                    onClick={() => setAction(a)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-colors",
+                      action === a
+                        ? m.color === "flare" ? "border-flare/50 bg-flare/[0.08] text-flare" : "border-mint/50 bg-mint/[0.08] text-mint"
+                        : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <MIcon className="h-4 w-4" />
+                    <span className="text-[11px] font-medium">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-border bg-secondary/20 p-4">
+              <p className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted-foreground">{meta.desc}</p>
               <div className="mt-2 flex items-baseline gap-2">
                 <p className="font-display text-2xl font-semibold tabular-nums">{invoices.length}</p>
-                <p className="text-[12.5px] text-muted-foreground">statutory demand{invoices.length === 1 ? "" : "s"}</p>
+                <p className="text-[12.5px] text-muted-foreground">invoice{invoices.length === 1 ? "" : "s"} selected</p>
               </div>
               <p className="mt-1.5 text-[12px] text-muted-foreground">
-                Total claimable: <span className="font-semibold text-mint">{inrCompact(totalClaim)}</span> · each buyer receives a §16 demand email with the compound-interest computation.
+                Total claimable: <span className="font-semibold text-mint">{inrCompact(totalClaim)}</span>
+                {action === "file" && " · each gets an ODR case number + 90-day §18 clock"}
               </p>
             </div>
 
@@ -540,10 +576,13 @@ function BulkServeDialog({
               <button
                 onClick={() => run.mutate()}
                 disabled={run.isPending || invoices.length === 0}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-flare h-10 text-[13px] font-semibold text-[#1a1305] disabled:opacity-50"
+                className={cn(
+                  "inline-flex flex-1 items-center justify-center gap-2 rounded-lg h-10 text-[13px] font-semibold disabled:opacity-50",
+                  meta.color === "flare" ? "bg-flare text-[#1a1305]" : "bg-mint text-[#04140b]",
+                )}
               >
-                <SendBulk className="h-4 w-4" />
-                {run.isPending ? "Serving demands…" : `Serve ${invoices.length} demand${invoices.length === 1 ? "" : "s"}`}
+                <Icon className="h-4 w-4" />
+                {run.isPending ? `${meta.verb.charAt(0).toUpperCase() + meta.verb.slice(1)}…` : `${meta.label} · ${invoices.length}`}
               </button>
             </div>
           </>

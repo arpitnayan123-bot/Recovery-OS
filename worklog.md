@@ -338,3 +338,48 @@ This round added **2 new features + styling polish** (mandatory per cron instruc
   3. **Theme-aware charts** — make the recharts tooltips/axis colors respond to the active theme (currently hardcoded for dark)
   4. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
   5. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
+
+---
+Task ID: 7
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 14 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview (forecast card + chart + theme toggle + shortcuts), invoices (bulk actions + comparison + checkboxes), cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous rounds' features all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on the top recommendation: bulk evidence pack + ODR filing.
+
+## Current goals/completed modifications/verification results
+This round added **2 new features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Bulk evidence pack + ODR filing (top recommendation) ✅
+- Extended `/api/invoices/bulk` to support 3 actions: `remind` (serve §15/§16 demand), `evidence` (seal 5-document evidence pack), `file` (file MSEFC ODR reference + start 90-day clock). Each action enforces the correct stage gate (remind→watch+overdue, evidence→reminder_sent, file→evidence_ready), is idempotent (skips invoices already past that stage with a reason), creates the right DB rows (Reminder/Document/Case + Events), and returns per-invoice results + summary. Capped at 100 invoices.
+- Rewrote `BulkServeDialog` → `BulkServeDialog` with an action selector (3 icon buttons: Serve demand / Seal evidence / File on ODR), dynamic descriptions, color-coded CTAs (flare for serve, mint for evidence/file), and a results view that adapts the verb ("served" / "sealed" / "filed"). Invalidates invoices/overview/forecast/cases queries on success.
+- Updated the header + selection-bar buttons to say "Bulk action" (was "Bulk serve").
+- E2E: opened bulk dialog → 3 action selectors rendered → selected "Seal evidence" → ran → correctly reported "0 sealed · 1 skipped" because the selected invoice was already past that stage (stage-gate logic confirmed). curl verified evidence action: `{summary:{total:1,done:1,skipped:0,notReady:0}, message:"Bulk evidence pack sealed on 1 invoice."}`.
+
+### Feature 2 — Theme-aware charts ✅
+- New hook: `src/hooks/use-theme.ts` — observes the `console-light` class on `<html>` via MutationObserver, returns "dark" or "light", re-renders on theme change.
+- Updated `forecast-chart.tsx` with a `useChartTheme()` helper that returns theme-aware colors: tooltip background (white in light / dark in dark), border, text color, axis fill, grid stroke, axis-line stroke, reference-line stroke. The chart now reads correctly in both themes.
+- E2E: toggled to light mode → chart rendered with light axis/grid/tooltip colors → toggled back to dark → chart reverted to dark colors. Zero errors.
+
+### Styling polish ✅
+- Bulk action selector: 3 icon buttons with active-state highlighting (flare for serve, mint for evidence/file)
+- Theme-aware chart: axis text, grid lines, tooltips, and reference lines all adapt to the active theme
+- Dynamic CTA colors: the bulk dialog's action button changes color based on the selected action (flare vs mint)
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: `/api/invoices/bulk` with action=evidence 200 (sealed 1 evidence pack), action=file supported, action=remind still works
+- agent-browser E2E: bulk dialog shows 3 action selectors, evidence action correctly skips already-sealed invoices, theme-aware chart renders in both light + dark modes, mobile 390px responsive, zero console errors
+- Artifacts: download/qa-r7-1-overview.png, qa-r7-2-bulk-actions.png, qa-r7-3-light-chart.png, qa-r7-4-final.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts (ties into the reminder engine)
+  2. **Theme-aware analytics charts** — apply the same useChartTheme pattern to the analytics dashboard's 4 recharts (aging, recovery velocity, pie, trend)
+  3. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
+  4. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
+  5. **Bulk action progress** — for 50+ invoices, show a live progress bar instead of a single spinner
