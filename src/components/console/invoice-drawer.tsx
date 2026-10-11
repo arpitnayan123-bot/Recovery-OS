@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ScanLine,
   FileDown,
+  TrendingUp,
 } from "lucide-react";
 import { StatusChip, Stamp, LiveInterest, fmtDate, fmtDateTime, inrCompact, KeyVal, Bar, RenderBoundary } from "./kit";
 import { inr } from "@/lib/format";
@@ -169,6 +170,9 @@ export function InvoiceDrawer({ invoiceId, onClose }: { invoiceId: string; onClo
 
               {/* statutory documents — downloadable PDFs */}
               <DocumentsPanel inv={inv} />
+
+              {/* per-invoice forecast — cost of inaction for this invoice */}
+              {inv.status !== "recovered" && inv.daysOverdue > 0 ? <InvoiceForecast inv={inv} /> : null}
 
               {/* case panel */}
               {inv.case ? <CasePanel inv={inv} /> : null}
@@ -683,6 +687,70 @@ function DocumentsPanel({ inv }: { inv: InvoiceDTO }) {
                 </p>
               )}
             </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------- invoice forecast --------------------------- */
+
+/** Per-invoice cost-of-inaction projection. Uses the same §16 monthly-compound
+ *  formula (3× bank rate) to show how much this single invoice will bleed over
+ *  7/30/60/90 days if no action is taken. Client-safe — no API call needed. */
+function InvoiceForecast({ inv }: { inv: InvoiceDTO }) {
+  const BANK_RATE = 5.75;
+  const annual = (BANK_RATE * 3) / 100;
+  const monthly = annual / 12;
+
+  const project = (daysAhead: number) => {
+    const futureDays = inv.daysOverdue + daysAhead;
+    const futureDue = inv.amount * Math.pow(1 + monthly, futureDays / 30);
+    const currentDue = inv.amount * Math.pow(1 + monthly, inv.daysOverdue / 30);
+    const delta = Math.max(0, futureDue - currentDue);
+    return { delta: Math.round(delta), future: Math.round(futureDue) };
+  };
+
+  const horizons = [
+    { days: 7, label: "7 days" },
+    { days: 30, label: "30 days" },
+    { days: 60, label: "60 days" },
+    { days: 90, label: "90 days" },
+  ];
+
+  const perDay = Math.round(project(30).delta / 30);
+  const ninety = project(90);
+
+  return (
+    <section className="mt-7 rounded-lg border border-alert/25 bg-alert/[0.03] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.2em] uppercase text-alert">
+          <TrendingUp className="h-3.5 w-3.5" /> Cost of inaction · this invoice
+        </h3>
+        <span className="font-mono text-[10px] tracking-[0.1em] uppercase text-muted-foreground">
+          +{inr(perDay)}/day
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+        If you do nothing, this invoice compounds <span className="font-semibold text-alert">{inr(ninety.delta)}</span> in additional §16 interest over the next 90 days — on top of the <span className="font-semibold text-flare">{inr(Math.round(inv.interest))}</span> already accrued.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {horizons.map((h) => {
+          const p = project(h.days);
+          return (
+            <div key={h.days} className={cn(
+              "rounded-md border p-2.5",
+              h.days === 90 ? "border-alert/40 bg-alert/[0.06]" : "border-border bg-secondary/30",
+            )}>
+              <p className="font-mono text-[8.5px] tracking-[0.12em] uppercase text-muted-foreground">{h.label}</p>
+              <p className={cn("mt-1 font-display text-[15px] font-semibold tabular-nums", h.days === 90 ? "text-alert" : "text-flare")}>
+                +{inrCompact(p.delta)}
+              </p>
+              <p className="mt-0.5 font-mono text-[8.5px] tracking-[0.06em] text-muted-foreground">
+                total {inrCompact(p.future)}
+              </p>
+            </div>
           );
         })}
       </div>

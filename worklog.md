@@ -194,3 +194,51 @@ This round added **4 new features + styling polish** (mandatory per cron instruc
   3. **Theme toggle** — light/dark switch (the marketing page already has a .theme-light scope)
   4. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts (ties into the reminder engine + audit log)
   5. **Invoice detail timeline enhancements** — render the forecast projection for the individual invoice inside the drawer
+
+---
+Task ID: 4
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 11 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview (with forecast card), invoices, cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous rounds' features (command palette Cmd+K, notifications bell, CSV export, animated counters, recovery forecast, PDF documents panel, settings account section) all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on new high-impact features from the worklog's recommended next-phase list.
+
+## Current goals/completed modifications/verification results
+This round added **3 new features** (mandatory per cron instructions):
+
+### Feature 1 — Bulk invoice actions (highest-value feature) ✅
+- New API: `/api/invoices/bulk` (POST) — accepts `{ ids: string[], action: "remind" }`, serves statutory demand notices (§15/§16) on every selected invoice that is in `watch` status and past its 45-day term. Idempotent: invoices already past watch are skipped and reported. Returns per-invoice results (served/skipped/not_overdue + reason) + a summary. Capped at 100 invoices per call. Writes audit row.
+- New UI in invoices-page.tsx:
+  - **Checkbox column** in the table — header has a "select all eligible" checkbox; each eligible row (watch + overdue) has a checkbox. Non-eligible rows show no checkbox. Selected rows get a mint tint.
+  - **Selection bar** — appears above the table when any invoice is selected: shows count, eligible-to-serve count, "Select all eligible (N)" / "Clear eligible" toggle, "Clear" button, and a flare "Serve N demands" button.
+  - **"Bulk serve" button** in the page header — shows the count of eligible invoices; clicking it auto-selects all eligible and opens the dialog.
+  - **BulkServeDialog** — confirmation modal showing the count + total claimable + per-invoice list, a "Serve N demands" button, then a results view (served/skipped/in-term stats + per-invoice outcome list + Done button). Invalidates invoices/overview/forecast queries on success.
+- E2E: opened invoices page → "Bulk serve 1" button appeared → clicked → dialog opened → clicked "Serve 1 demand" → toast "Bulk demand served on 1 invoice" → ORBT/2231 status changed from "Watching" to "Notice served" → results view showed 1 served, 0 skipped. curl verified: `{summary:{total:1,served:1,skipped:0,notOverdue:0}}`.
+
+### Feature 2 — AI forecast narrative (LLM) ✅
+- Extended `/api/forecast` with `?ai=1` — calls zai.chat.completions with a cost-of-inaction-analyst system prompt, sends a compact brief (per-day bleed, 90-day bleed, total claimable, top 3 leak contributors, critical MSEFC clocks), returns a plain-English 2-3 sentence narrative citing real invoice numbers and rupee amounts. Graceful fallback (narrative: null) if the LLM is unreachable.
+- Updated `forecast-card.tsx` — added "Explain in plain English" button (mint, Sparkles icon) in the card header. On click, fetches the AI narrative with a loading state ("AI analysing…"), then renders the narrative in a mint-tinted callout below the headline with a framer-motion fade-in.
+- E2E: clicked "Explain in plain English" → after ~20s, narrative rendered: "Inaction is costing you ₹5,31,496 over the next 90 days with daily bleed of ₹5,800, primarily driven by invoice NSR/2026/1102 with Northstar Retail India Ltd, which has the highest current interest of ₹2,99,962 and growing delta of ₹1,96,864." — grounded in real portfolio data.
+
+### Feature 3 — Invoice-level forecast projection in the drawer ✅
+- New `InvoiceForecast` component in invoice-drawer.tsx — computes the per-invoice cost-of-inaction client-side using the same §16 monthly-compound formula (3× bank rate). Shows: "+₹X/day" bleed rate, a plain-English summary ("If you do nothing, this invoice compounds ₹X in additional §16 interest over the next 90 days — on top of the ₹Y already accrued"), and 4 horizon cards (7/30/60/90 days with incremental + total amounts, the 90-day card highlighted in alert red).
+- Rendered in the drawer between the documents panel and the case panel, only for non-recovered overdue invoices.
+- E2E: opened KAV/0871 drawer → "COST OF INACTION · THIS INVOICE" panel rendered → "If you do nothing, this invoice compounds ₹50,201 in additional §16 interest over the next 90 days — on top of the ₹27,508 already accrued" + 4 horizon cards.
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: `/api/invoices/bulk` 200 (served ORBT/2231 successfully), `/api/forecast?ai=1` 200 (narrativeAI: true, real grounded narrative)
+- agent-browser E2E: bulk serve dialog flow (select → confirm → serve → status change → results), AI narrative button (loading → grounded paragraph), invoice drawer forecast panel (correct per-invoice projections), zero console errors
+- Artifacts: download/qa-r4-2-final-overview.png, qa-r4-3-mobile.png, qa-r4-4-final.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Bulk evidence pack assembly** — extend bulk actions to support "seal evidence" and "file on ODR" in addition to "serve demand" (the bulk API already has the action parameter)
+  2. **Theme toggle** — light/dark switch (the marketing page already has a .theme-light scope)
+  3. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts
+  4. **Recovery forecast chart** — a recharts visualization of the 90-day projection curve on the overview (alongside the forecast card)
+  5. **Invoice comparison view** — select 2-3 invoices and compare their forecast projections side-by-side

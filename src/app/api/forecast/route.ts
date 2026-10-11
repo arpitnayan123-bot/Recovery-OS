@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { getSessionOrg } from "@/lib/session";
 import { getSessionUser, audit, AUDIT } from "@/lib/auth";
 import { prisma, invoiceInterest, daysOverdue, interestPerSecond, MSEFC_DECISION_DAYS } from "@/lib/recovery";
+import ZAI from "z-ai-web-dev-sdk";
 
 const DAY = 86_400_000;
+
+const NARRATIVE_SYSTEM = `You are Recovery OS's cost-of-inaction analyst. You receive a portfolio forecast (bleed rates, projected interest, MSEFC clock risk). Write a single tight paragraph (2-3 sentences, max 60 words) in plain English that tells the supplier exactly what inaction is costing them right now and which invoice/buyer is the biggest leak. Cite real invoice numbers and rupee amounts from the data. Be direct, not alarmist. Output only the paragraph — no markdown, no headers.`;
 
 /**
  * GET /api/forecast
@@ -107,7 +110,7 @@ export async function GET(req: Request) {
 
   await audit(org.id, user?.email ?? "anonymous", "forecast.view", { liveCount: live.length, perDay });
 
-  return NextResponse.json({
+  const base = {
     asOf: now.toISOString(),
     liveCount: live.length,
     principalAtRisk: live.reduce((s, i) => s + i.amount, 0),
@@ -119,5 +122,38 @@ export async function GET(req: Request) {
     clockRisk,
     totalClaimableNow: Math.round(totalClaimableNow),
     ninetyDayBleed: projection.find((p) => p.days === 90)?.incrementalInterest ?? 0,
-  });
+  };
+
+  // optional AI narrative (?ai=1) — plain-English cost-of-inaction summary
+  const url = new URL(req.url);
+  if (url.searchParams.get("ai") === "1" && live.length > 0) {
+    let narrative: string | null = null;
+    try {
+      const zai = await ZAI.create();
+      const top = projection.find((p) => p.days === 90)?.topContributors?.slice(0, 3) ?? [];
+      const brief = {
+        perDay,
+        perHour,
+        ninetyDayBleed: base.ninetyDayBleed,
+        totalClaimableNow: base.totalClaimableNow,
+        liveCount: live.length,
+        topLeaks: top,
+        criticalClocks: clockRisk.filter((c) => c.critical).map((c) => ({ caseNumber: c.caseNumber, buyer: c.buyer, daysLeft: c.daysLeft })),
+      };
+      const completion = await zai.chat.completions.create({
+        messages: [
+          { role: "assistant", content: NARRATIVE_SYSTEM },
+          { role: "user", content: `Forecast snapshot (JSON):\n${JSON.stringify(brief, null, 2)}` },
+        ],
+        stream: false,
+        thinking: { type: "disabled" },
+      });
+      narrative = (completion.choices?.[0]?.message?.content ?? "").trim() || null;
+    } catch (e: any) {
+      console.error("[forecast] AI narrative failed:", e?.message);
+    }
+    return NextResponse.json({ ...base, narrative, narrativeAI: !!narrative });
+  }
+
+  return NextResponse.json(base);
 }

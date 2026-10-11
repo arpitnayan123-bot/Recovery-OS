@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { TrendingDown, Clock, AlertTriangle, ArrowRight, Zap } from "lucide-react";
+import { TrendingDown, Clock, AlertTriangle, ArrowRight, Zap, Sparkles, Loader2 } from "lucide-react";
 import { inrCompact, fmtDate, LiveInterest } from "@/components/console/kit";
 import { inr } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -39,14 +40,29 @@ type Forecast = {
   }[];
   totalClaimableNow: number;
   ninetyDayBleed: number;
+  narrative?: string | null;
+  narrativeAI?: boolean;
 };
 
 export function ForecastCard() {
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
   const { data, isLoading } = useQuery<Forecast>({
     queryKey: ["forecast"],
     queryFn: async () => (await fetch("/api/forecast")).json(),
     staleTime: 30_000,
   });
+
+  const fetchNarrative = async () => {
+    setNarrativeLoading(true);
+    try {
+      const res = await fetch("/api/forecast?ai=1");
+      const d = await res.json();
+      setNarrative(d.narrative ?? null);
+    } catch { /* ignore */ } finally {
+      setNarrativeLoading(false);
+    }
+  };
 
   if (isLoading || !data) {
     return (
@@ -86,13 +102,40 @@ export function ForecastCard() {
               <span className="tabular-nums text-alert">{inr(data.perDay)}</span>
             </h2>
           </div>
-          <div className="hidden text-right sm:block">
-            <p className="font-display text-2xl font-semibold tabular-nums text-alert">
-              <LiveInterest baseInterest={0} perSecond={data.perSecond} compact />
-            </p>
-            <p className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-muted-foreground">bleeding now / sec</p>
+          <div className="flex items-center gap-2.5">
+            {!narrative && !narrativeLoading && (
+              <button
+                onClick={fetchNarrative}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-mint/30 bg-mint/[0.06] px-3 h-9 text-[11.5px] font-medium text-mint transition-colors hover:bg-mint/[0.12]"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Explain in plain English
+              </button>
+            )}
+            {narrativeLoading && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 h-9 text-[11.5px] text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> AI analysing…
+              </span>
+            )}
+            <div className="hidden text-right sm:block">
+              <p className="font-display text-2xl font-semibold tabular-nums text-alert">
+                <LiveInterest baseInterest={0} perSecond={data.perSecond} compact />
+              </p>
+              <p className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-muted-foreground">bleeding now / sec</p>
+            </div>
           </div>
         </div>
+
+        {/* AI narrative */}
+        {narrative && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 flex gap-2.5 rounded-lg border border-mint/20 bg-mint/[0.04] px-3.5 py-2.5"
+          >
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint" />
+            <p className="text-[12.5px] leading-relaxed text-foreground/90">{narrative}</p>
+          </motion.div>
+        )}
 
         {/* live bleed strip */}
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
