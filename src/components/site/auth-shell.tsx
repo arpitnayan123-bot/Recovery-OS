@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Loader2, ShieldCheck, AlertTriangle, Lock, Mail, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, ShieldCheck, AlertTriangle, Lock, Mail, User, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/site/logo";
 import { Providers } from "@/components/console/providers";
@@ -84,6 +84,29 @@ function AuthForm({ mode }: { mode: Mode }) {
       setError(null);
       // give the toast a beat, then route
       setTimeout(() => router.push(next), 280);
+    },
+    onError: (e: Error) => {
+      setError(e.message);
+      toast.error(e.message);
+    },
+  });
+
+  // demo sign-in: spin up a seeded demo org + session, then go to the profile
+  const demoSignIn = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "demo" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.org?.id) throw new Error(data?.error ?? "Demo sign-in failed");
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Demo workspace ready — welcome to Recovery OS.");
+      setError(null);
+      setTimeout(() => router.push("/console/profile"), 300);
     },
     onError: (e: Error) => {
       setError(e.message);
@@ -179,6 +202,30 @@ function AuthForm({ mode }: { mode: Mode }) {
                     {!submit.isPending && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
                   </button>
                 </form>
+
+                {/* demo sign-in — only on the login page */}
+                {mode === "login" && (
+                  <div className="mt-5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-white/8" />
+                      <span className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-muted-foreground">or</span>
+                      <div className="h-px flex-1 bg-white/8" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => demoSignIn.mutate()}
+                      disabled={demoSignIn.isPending}
+                      className="group relative mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-mint/30 bg-mint/[0.06] px-4 h-11 text-[13.5px] font-medium text-mint transition-all hover:border-mint/50 hover:bg-mint/[0.1] disabled:opacity-60"
+                    >
+                      {demoSignIn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {demoSignIn.isPending ? "Spinning up demo…" : "Use demo sign in"}
+                      {!demoSignIn.isPending && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
+                    </button>
+                    <p className="mt-2.5 text-center text-[11px] leading-relaxed text-muted-foreground/70">
+                      No password needed — explore the full Recovery OS console with a seeded demo workspace.
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-6 flex items-center justify-between border-t border-white/8 pt-5 text-[12.5px]">
                   <span className="text-muted-foreground">{copy.switchText}</span>
