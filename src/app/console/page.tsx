@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw, FilePlus2, ArrowRight, Scale, Inbox, Radio, Sparkles } from "lucide-react";
 import { StatCard, LiveInterest, Bar, PageHead, inrCompact, fmtDate, AnimatedNumber } from "@/components/console/kit";
+import { ForecastCard } from "@/components/console/forecast-card";
 import { inr } from "@/lib/format";
 import { EventRow, DeadlineBadge } from "@/components/console/event-row";
 import { CASE_STAGE_META } from "@/lib/domain";
@@ -151,6 +152,11 @@ export default function ConsoleOverviewPage() {
           Open plan <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </Link>
+
+      {/* Cost of inaction forecast */}
+      <div className="mt-6">
+        <ForecastCard />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         {/* Pipeline funnel */}

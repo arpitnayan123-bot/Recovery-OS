@@ -79,4 +79,6 @@ export const AUDIT = {
   NOTICE_PDF: "document.notice_pdf",
   CRON_TICK: "cron.tick",
   SESSION_END: "session.end",
+  FORECAST: "forecast.view",
+  PASSWORD_CHANGE: "auth.password_change",
 } as const;

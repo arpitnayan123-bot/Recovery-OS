@@ -167,6 +167,9 @@ export function InvoiceDrawer({ invoiceId, onClose }: { invoiceId: string; onClo
                 />
               </div>
 
+              {/* statutory documents — downloadable PDFs */}
+              <DocumentsPanel inv={inv} />
+
               {/* case panel */}
               {inv.case ? <CasePanel inv={inv} /> : null}
 
@@ -595,6 +598,93 @@ function Notices({ reminders }: { reminders: InvoiceDTO["reminders"] }) {
             ) : null}
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* ----------------------------- documents panel ----------------------------- */
+
+/** Downloadable statutory PDFs — statutory notice (always), evidence pack
+ *  (once sealed), ODR dossier (once filed). The API generates real PDFs. */
+function DocumentsPanel({ inv }: { inv: InvoiceDTO }) {
+  const hasEvidence = inv.stageIndex >= 2 || inv.docs.length > 0;
+  const hasCase = !!inv.case;
+
+  const docs = [
+    {
+      kind: "statutory_notice" as const,
+      label: "Statutory demand notice",
+      desc: "§15/§16 demand letter — principal + compound interest",
+      available: inv.daysOverdue > 0 || inv.status !== "watch",
+      tone: "flare" as const,
+    },
+    {
+      kind: "evidence_pack" as const,
+      label: "Evidence pack",
+      desc: "5-document verified pack — PO, challans, GST filings",
+      available: hasEvidence,
+      tone: "mint" as const,
+    },
+    {
+      kind: "odr_dossier" as const,
+      label: "ODR filing dossier",
+      desc: "Reference package for the MSEFC council (§18)",
+      available: hasCase,
+      tone: "mint" as const,
+    },
+  ];
+
+  return (
+    <section className="mt-7">
+      <h3 className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.2em] uppercase text-muted-foreground">
+        <FileDown className="h-3.5 w-3.5 text-mint" /> Statutory documents · PDF
+      </h3>
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+        {docs.map((d) => {
+          const tone = d.tone === "flare" ? "border-flare/30 bg-flare/[0.04]" : "border-mint/25 bg-mint/[0.03]";
+          return (
+            <a
+              key={d.kind}
+              href={d.available ? `/api/documents/${inv.id}?kind=${d.kind}` : undefined}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={!d.available}
+              className={cn(
+                "group relative flex flex-col rounded-lg border p-3.5 transition-all",
+                d.available
+                  ? cn(tone, "hover:border-mint/40 hover:shadow-md cursor-pointer")
+                  : "border-border bg-secondary/20 opacity-50 cursor-not-allowed",
+              )}
+              onClick={(e) => { if (!d.available) e.preventDefault(); }}
+            >
+              <div className="flex items-center justify-between">
+                <span className={cn(
+                  "inline-flex h-7 w-7 items-center justify-center rounded-md border",
+                  d.available
+                    ? d.tone === "flare" ? "border-flare/30 bg-flare/10 text-flare" : "border-mint/30 bg-mint/10 text-mint"
+                    : "border-border bg-secondary text-muted-foreground",
+                )}>
+                  <FileDown className="h-3.5 w-3.5" />
+                </span>
+                {d.available ? (
+                  <span className="font-mono text-[8.5px] tracking-[0.14em] uppercase text-mint opacity-0 transition-opacity group-hover:opacity-100">
+                    open ↗
+                  </span>
+                ) : (
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                )}
+              </div>
+              <p className="mt-2.5 text-[12.5px] font-medium leading-snug">{d.label}</p>
+              <p className="mt-1 text-[10.5px] leading-snug text-muted-foreground">{d.desc}</p>
+              {!d.available && (
+                <p className="mt-1.5 font-mono text-[8.5px] tracking-[0.1em] uppercase text-muted-foreground/70">
+                  {d.kind === "statutory_notice" ? "overdue to unlock" : d.kind === "evidence_pack" ? "seal evidence first" : "file on ODR first"}
+                </p>
+              )}
+            </a>
+          );
+        })}
       </div>
     </section>
   );

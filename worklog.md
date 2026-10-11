@@ -142,3 +142,55 @@ This round focused on **premium UX features + styling polish** (mandatory per cr
   4. **Settings page enrichment** — show user account info, change-password form, connected sources management
   5. **Theme toggle** — light/dark switch (currently dark-only; the marketing page has a .theme-light scope that could be extended)
   6. **Email notification preferences** — let users choose which machine-feed events trigger email alerts (ties into the reminder engine)
+
+---
+Task ID: 3
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 9 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview, invoices, cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous round's features (command palette Cmd+K, notifications bell, CSV export, animated counters) all confirmed working.
+- Core pipeline verified: opened ORBT/2231 drawer → "Serve demand on Orbit" + "Preview the statutory notice" + "Buyer paid out of band" buttons present; notice preview modal shows "Download PDF" + "Issue & serve".
+- PDF generation confirmed (statutory_notice: 200, application/pdf).
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on new high-impact features.
+
+## Current goals/completed modifications/verification results
+This round added **4 new features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Recovery Forecast API + card (NEW, high visual impact) ✅
+- New API: `/api/forecast` — the "cost of inaction" engine. Computes: live §16 bleed rates (per-second/minute/hour/day), projected interest accrual over 7/30/60/90-day horizons (with per-invoice breakdown + top contributors), MSEFC 90-day clock risk (flags critical ≤14d and at-risk ≤30d cases), and the opportunity delta (recover today vs. wait 90 days). Every figure computed from the same §16 engine.
+- New component: `src/components/console/forecast-card.tsx` — premium alert-toned card with: "Every day you wait costs ₹X" headline, live per-second bleed ticker (LiveInterest), 4 bleed-rate stats (per minute/hour/day/month), 4 horizon projection cards (7/30/60/90 days with incremental + total interest + top contributor), MSEFC clock-risk list (color-coded by urgency), and an opportunity CTA showing recover-now vs. 90-day-later amounts. Skeleton loader while fetching. Hidden when no live invoices.
+- Wired into the overview page between the AI insights teaser and the pipeline funnel.
+- E2E: card renders "Every day you wait costs ₹5,800", bleed rates (₹242/hr, ₹5,800/day), 4 projection cards, 1 MSEFC clock at risk, opportunity section.
+
+### Feature 2 — Invoice drawer PDF enhancements (Evidence Pack + ODR Dossier) ✅
+- New `DocumentsPanel` component in invoice-drawer.tsx — a 3-card grid showing all statutory PDF document types: Statutory demand notice (§15/§16), Evidence pack (5-document verified), ODR filing dossier (§18). Each card shows availability state: available (green/flare tint, hover lift, "open ↗" affordance) or locked (muted, lock icon, "overdue to unlock" / "seal evidence first" / "file on ODR first" hint). The API already supported all 3 kinds from a previous round.
+- Availability logic: statutory notice available when overdue OR past watch stage; evidence pack available when stageIndex ≥ 2 OR docs exist; ODR dossier available when a case exists.
+- E2E: for ORBT/2231 (watch, overdue) → statutory notice available, evidence pack + dossier locked with hints. For SPC/2026/0417 (hearing, has case) → all 3 unlocked. Evidence Pack PDF (3.2KB) + ODR Dossier PDF (3.1KB) both return valid PDF 1.7.
+
+### Feature 3 — Settings page account section + change-password (NEW) ✅
+- New API: `/api/auth/password` (POST) — changes the signed-in user's password. Requires current password to match (bcrypt verify), validates new password ≥8 chars and ≠ current, updates the hash, writes an audit row (AUDIT.PASSWORD_CHANGE).
+- Rewrote settings page: added an "Account" section showing the signed-in user (email, name, phone, member-since, session security note) + a change-password form (current/new/confirm fields, inline error, loading state). When no user is linked to the workspace (demo sessions), shows a "Create account" CTA instead. Danger zone now spans full width.
+- E2E: curl flow — signup → change password with wrong current (401 "Current password is incorrect") → change with correct current ({"ok":true}) → login with new password (200) → login with old password (401, old no longer works). Settings page shows account info when logged in, create-account CTA when not.
+
+### Feature 4 — Styling polish ✅
+- Skeleton loaders: ForecastCard shows a proper skeleton (header bar + content area + 4 stat boxes) while fetching, instead of a blank space.
+- Hover micro-interactions: document PDF cards have hover lift (hover:shadow-md) + "open ↗" affordance fade-in; forecast projection cards animate in with staggered framer-motion; opportunity CTA has gradient + arrow.
+- Added AUDIT.FORECAST + AUDIT.PASSWORD_CHANGE action constants; forecast view + password change are now audited.
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: /api/forecast 200 (returns live data: 7 live invoices, ₹5,800/day bleed, ₹5.3L 90-day projection, 1 clock at risk), /api/auth/password 200 (change-password flow fully verified via curl)
+- agent-browser E2E: forecast card renders with headline + bleed rates + projections + clock risk + opportunity, invoice drawer documents panel shows 3 PDF cards with correct lock/unlock states per invoice stage, settings page account section renders, mobile 390px responsive, zero console errors
+- Artifacts: download/qa-r3-2-forecast.png, qa-r3-3-mobile-forecast.png, qa-r3-4-full-overview.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Bulk invoice actions** — select multiple invoices via checkboxes + bulk-serve/bulk-file (high-value for suppliers with 50+ overdue invoices); the forecast card's "top contributors" data already identifies the priority targets
+  2. **Recovery forecast AI narrative** — extend /api/forecast with an optional LLM call (?ai=1) that narrates the cost-of-inaction in plain English ("If you do nothing for 30 days, Northstar Retail alone will cost you ₹X in additional interest…")
+  3. **Theme toggle** — light/dark switch (the marketing page already has a .theme-light scope)
+  4. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts (ties into the reminder engine + audit log)
+  5. **Invoice detail timeline enhancements** — render the forecast projection for the individual invoice inside the drawer

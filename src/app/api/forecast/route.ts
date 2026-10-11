@@ -1,0 +1,123 @@
+import { NextResponse } from "next/server";
+import { getSessionOrg } from "@/lib/session";
+import { getSessionUser, audit, AUDIT } from "@/lib/auth";
+import { prisma, invoiceInterest, daysOverdue, interestPerSecond, MSEFC_DECISION_DAYS } from "@/lib/recovery";
+
+const DAY = 86_400_000;
+
+/**
+ * GET /api/forecast
+ * The "cost of inaction" engine. Computes, for the live portfolio:
+ *  - how much §16 interest will accrue over the next 7 / 30 / 60 / 90 days
+ *    (assuming no invoices are recovered / no new invoices are added)
+ *  - which ODR cases are at risk of breaching the 90-day MSEFC decision window
+ *  - per-day and per-hour bleed rates (so the UI can show a live ticker)
+ *  - an AI-narrated recommendation (optional, ?ai=1) summarising the cost
+ *
+ * Every figure is computed from the same §16 engine — no guessing.
+ */
+export async function GET(req: Request) {
+  const org = await getSessionOrg();
+  if (!org) return NextResponse.json({ error: "No session" }, { status: 401 });
+  const user = await getSessionUser();
+
+  const invoices = await prisma.invoice.findMany({
+    where: { orgId: org.id },
+    include: { buyer: true, case: true },
+  });
+  const cases = await prisma.case.findMany({
+    where: { orgId: org.id, stage: { not: "award" } },
+    include: { invoice: { include: { buyer: true } } },
+  });
+
+  const now = new Date();
+  const live = invoices.filter((i) => i.status !== "recovered");
+
+  // projected interest accrual over the horizon windows
+  const horizons = [7, 30, 60, 90];
+  const projection = horizons.map((days) => {
+    const future = new Date(now.getTime() + days * DAY);
+    let interestNow = 0;
+    let interestFuture = 0;
+    let principal = 0;
+    const invoiceBreakdown: { number: string; buyer: string; interestNow: number; interestFuture: number; delta: number }[] = [];
+
+    for (const inv of live) {
+      const od = daysOverdue({ dueOn: inv.dueOn }, now);
+      if (od <= 0) {
+        // not overdue yet — it might become overdue within the window
+        const futureOd = daysOverdue({ dueOn: inv.dueOn }, future);
+        if (futureOd <= 0) continue; // still inside term
+        // accrues only from the day it breaks term
+        principal += inv.amount;
+        const futureInterest = invoiceInterest(inv.amount, inv.dueOn, future).interest;
+        interestFuture += futureInterest;
+        invoiceBreakdown.push({ number: inv.number, buyer: inv.buyer.name, interestNow: 0, interestFuture: Math.round(futureInterest), delta: Math.round(futureInterest) });
+      } else {
+        principal += inv.amount;
+        const now_ = invoiceInterest(inv.amount, inv.dueOn, now).interest;
+        const fut = invoiceInterest(inv.amount, inv.dueOn, future).interest;
+        interestNow += now_;
+        interestFuture += fut;
+        invoiceBreakdown.push({ number: inv.number, buyer: inv.buyer.name, interestNow: Math.round(now_), interestFuture: Math.round(fut), delta: Math.round(fut - now_) });
+      }
+    }
+
+    invoiceBreakdown.sort((a, b) => b.delta - a.delta);
+
+    return {
+      days,
+      label: days === 7 ? "Next 7 days" : days === 30 ? "Next 30 days" : days === 60 ? "Next 60 days" : "Next 90 days",
+      interestAccruedNow: Math.round(interestNow),
+      interestAccruedFuture: Math.round(interestFuture),
+      incrementalInterest: Math.round(Math.max(0, interestFuture - interestNow)),
+      principal,
+      topContributors: invoiceBreakdown.slice(0, 5),
+    };
+  });
+
+  // live bleed rates
+  const perSecond = live.reduce((s, i) => s + interestPerSecond(i.amount, i.dueOn, now), 0);
+  const perDay = Math.round(perSecond * 86400);
+  const perHour = Math.round(perSecond * 3600);
+  const perMinute = Math.round(perSecond * 60);
+
+  // MSEFC clock risk — cases approaching the 90-day decision deadline
+  const clockRisk = cases.map((c) => {
+    const decisionBy = new Date(c.filedOn.getTime() + MSEFC_DECISION_DAYS * DAY);
+    const daysLeft = Math.ceil((decisionBy.getTime() - now.getTime()) / DAY);
+    const { totalDue } = invoiceInterest(c.invoice.amount, c.invoice.dueOn, now);
+    return {
+      id: c.id,
+      caseNumber: c.caseNumber,
+      stage: c.stage,
+      buyer: c.invoice.buyer.name,
+      invoiceNumber: c.invoice.number,
+      claim: Math.round(totalDue),
+      filedOn: c.filedOn,
+      decisionBy,
+      daysLeft,
+      atRisk: daysLeft <= 30,
+      critical: daysLeft <= 14,
+    };
+  }).sort((a, b) => a.daysLeft - b.daysLeft);
+
+  // opportunity: if all overdue invoices were recovered today
+  const totalClaimableNow = live.reduce((s, i) => s + invoiceInterest(i.amount, i.dueOn, now).totalDue, 0);
+
+  await audit(org.id, user?.email ?? "anonymous", "forecast.view", { liveCount: live.length, perDay });
+
+  return NextResponse.json({
+    asOf: now.toISOString(),
+    liveCount: live.length,
+    principalAtRisk: live.reduce((s, i) => s + i.amount, 0),
+    perSecond,
+    perMinute,
+    perHour,
+    perDay,
+    projection,
+    clockRisk,
+    totalClaimableNow: Math.round(totalClaimableNow),
+    ninetyDayBleed: projection.find((p) => p.days === 90)?.incrementalInterest ?? 0,
+  });
+}
