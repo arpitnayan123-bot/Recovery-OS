@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { TrendingUp, Clock, Layers, Users, Activity, Award } from "lucide-react";
 import { PageHead, StatCard, inrCompact } from "@/components/console/kit";
+import { useChartTheme } from "@/components/console/chart-theme";
 import { inr } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -23,17 +24,6 @@ type Analytics = {
 const STAGE_COLORS = ["#2df09c", "#f9b830", "#f9b830", "#2df09c", "#2df09c"];
 const AGING_COLORS = ["#2df09c", "#f9b830", "#f9774d", "#e8453a"];
 
-const tooltipStyle = {
-  background: "rgba(11,14,12,0.95)",
-  border: "1px solid rgba(45,240,156,0.22)",
-  borderRadius: "8px",
-  color: "#ecefe9",
-  fontFamily: "var(--font-inter)",
-  fontSize: "12px",
-  padding: "8px 12px",
-};
-const axisStyle = { fontSize: 11, fill: "rgba(236,239,233,0.55)", fontFamily: "var(--font-mono)" };
-
 function shortInr(v: number) {
   if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
   if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`;
@@ -46,6 +36,7 @@ export default function AnalyticsPage() {
     queryKey: ["analytics"],
     queryFn: async () => (await fetch("/api/analytics")).json(),
   });
+  const ct = useChartTheme();
 
   if (isLoading || !data) {
     return (
@@ -90,10 +81,10 @@ export default function AnalyticsPage() {
           <div className="mt-5 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={aging} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(236,239,233,0.06)" vertical={false} />
-                <XAxis dataKey="label" tick={axisStyle} tickLine={false} axisLine={{ stroke: "rgba(236,239,233,0.1)" }} interval={0} angle={-12} textAnchor="end" height={50} />
-                <YAxis tickFormatter={shortInr} tick={axisStyle} tickLine={false} axisLine={false} width={56} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [inr(Math.round(v)), n === "interest" ? "§16 interest" : n]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+                <XAxis dataKey="label" tick={ct.axis} tickLine={false} axisLine={{ stroke: ct.axisLine }} interval={0} angle={-12} textAnchor="end" height={50} />
+                <YAxis tickFormatter={shortInr} tick={ct.axis} tickLine={false} axisLine={false} width={56} />
+                <Tooltip contentStyle={ct.tooltip} formatter={(v: number, n: string) => [inr(Math.round(v)), n === "interest" ? "§16 interest" : n]} />
                 <Bar dataKey="principal" stackId="a" radius={[0, 0, 0, 0]} maxBarSize={48}>
                   {aging.map((_, i) => <Cell key={i} fill={AGING_COLORS[i]} fillOpacity={0.45} />)}
                 </Bar>
@@ -133,10 +124,10 @@ export default function AnalyticsPage() {
                     <stop offset="100%" stopColor="#2df09c" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(236,239,233,0.06)" vertical={false} />
-                <XAxis dataKey="day" tick={axisStyle} tickLine={false} axisLine={{ stroke: "rgba(236,239,233,0.1)" }} interval={5} />
-                <YAxis tickFormatter={shortInr} tick={axisStyle} tickLine={false} axisLine={false} width={56} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [inr(Math.round(v)), "interest accrued"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+                <XAxis dataKey="day" tick={ct.axis} tickLine={false} axisLine={{ stroke: ct.axisLine }} interval={5} />
+                <YAxis tickFormatter={shortInr} tick={ct.axis} tickLine={false} axisLine={false} width={56} />
+                <Tooltip contentStyle={ct.tooltip} formatter={(v: number) => [inr(Math.round(v)), "interest accrued"]} />
                 <Area type="monotone" dataKey="interest" stroke="#2df09c" strokeWidth={2} fill="url(#gInterest)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -154,10 +145,10 @@ export default function AnalyticsPage() {
           <div className="mt-5 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={recovery} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(236,239,233,0.06)" vertical={false} />
-                <XAxis dataKey="label" tick={axisStyle} tickLine={false} axisLine={{ stroke: "rgba(236,239,233,0.1)" }} />
-                <YAxis tickFormatter={shortInr} tick={axisStyle} tickLine={false} axisLine={false} width={56} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [inr(Math.round(v)), "recovered"]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+                <XAxis dataKey="label" tick={ct.axis} tickLine={false} axisLine={{ stroke: ct.axisLine }} />
+                <YAxis tickFormatter={shortInr} tick={ct.axis} tickLine={false} axisLine={false} width={56} />
+                <Tooltip contentStyle={ct.tooltip} formatter={(v: number) => [inr(Math.round(v)), "recovered"]} />
                 <Bar dataKey="recovered" radius={[6, 6, 0, 0]} maxBarSize={56} fill="#2df09c" />
               </BarChart>
             </ResponsiveContainer>
@@ -182,8 +173,8 @@ export default function AnalyticsPage() {
                 <Pie data={statusDist} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={48} outerRadius={88} paddingAngle={2}>
                   {statusDist.map((_, i) => <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} stroke="rgba(11,14,12,0.8)" strokeWidth={2} />)}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [`${v} invoices`, n]} />
-                <Legend wrapperStyle={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "rgba(236,239,233,0.6)" }} iconType="circle" iconSize={8} />
+                <Tooltip contentStyle={ct.tooltip} formatter={(v: number, n: string) => [`${v} invoices`, n]} />
+                <Legend wrapperStyle={ct.legend} iconType="circle" iconSize={8} />
               </PieChart>
             </ResponsiveContainer>
           </div>

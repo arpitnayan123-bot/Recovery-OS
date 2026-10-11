@@ -81,4 +81,5 @@ export const AUDIT = {
   SESSION_END: "session.end",
   FORECAST: "forecast.view",
   PASSWORD_CHANGE: "auth.password_change",
+  DIGEST: "digest.update",
 } as const;

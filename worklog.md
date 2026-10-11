@@ -383,3 +383,50 @@ This round added **2 new features + styling polish** (mandatory per cron instruc
   3. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
   4. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
   5. **Bulk action progress** — for 50+ invoices, show a live progress bar instead of a single spinner
+
+---
+Task ID: 8
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 15 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview, invoices (bulk actions + comparison), cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous rounds' features (command palette, notifications, forecast card + chart, bulk actions, comparison, theme toggle, keyboard shortcuts, theme-aware forecast chart) all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on the top 2 recommendations: theme-aware analytics charts + email digest preferences.
+
+## Current goals/completed modifications/verification results
+This round added **2 new features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Theme-aware analytics charts (top recommendation) ✅
+- Created shared `src/components/console/chart-theme.ts` — a `useChartTheme()` hook that returns theme-aware colors (tooltip bg/border/text, axis fill, grid stroke, axis-line stroke, reference-line stroke, legend color). Refactored the forecast chart to use this shared helper (removed its local copy).
+- Updated the analytics dashboard's 4 recharts (stacked aging BarChart, §16 AreaChart, recovery velocity BarChart, pipeline PieChart) to use `useChartTheme()` — all axis text, grid lines, tooltips, and legends now adapt to the active console theme.
+- E2E: toggled to light mode → all 4 charts rendered with light axis/grid/tooltip/legend colors → toggled back to dark → reverted correctly. Zero errors.
+
+### Feature 2 — Email digest preferences ✅
+- New Prisma model: `DigestPreference` (orgId unique, email/whatsapp/sms channel toggles, 5 alert triggers: overdue/clockRisk/forecast/recovery/insight, forecastThreshold ₹/day, cadence instant/daily/weekly). Pushed to DB.
+- New API: `/api/digest` (GET returns prefs or defaults; POST upserts with validation — channels, alerts, threshold 0-1M, cadence enum). Writes an audit row (AUDIT.DIGEST).
+- New component: `src/components/console/digest-preferences.tsx` — a full preferences panel with: 3 channel cards (Email/WhatsApp/SMS with icons + status dots), 5 alert-trigger toggle rows (with toggle switches + tone-colored icons), forecast-threshold number input (₹/day), 3-button cadence selector (Instant/Daily/Weekly). Optimistic updates + auto-save on toggle/change. Skeleton loader.
+- Wired into the settings page (full-width section between Data source and Danger zone).
+- E2E: GET returns defaults → toggled "Forecast digest" alert → POST saved (alertForecast: true) → toggled WhatsApp channel → saved. curl verified upsert: `{whatsappEnabled:true, forecastThreshold:25000, cadence:"daily"}`.
+
+### Styling polish ✅
+- Shared chart-theme helper: single source of truth for all recharts colors across the console
+- Toggle switches: animated pill switches with smooth transitions for alert triggers
+- Channel cards: status dots (mint pulse when active) + hover states
+- Cadence selector: 3-button segmented control with active-state highlighting
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: `/api/digest` GET 200 (returns defaults), POST 200 (upserts + returns prefs)
+- agent-browser E2E: analytics charts render in both light + dark modes (all 4 adapt), digest preferences panel renders with channels/alerts/threshold/cadence, toggles save correctly, mobile 390px responsive, zero console errors
+- Artifacts: download/qa-r8-1-overview.png, qa-r8-2-analytics-light.png, qa-r8-3-settings.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Wire digest preferences into the reminder engine** — the cron/tick should check `DigestPreference` before queuing alerts (only send WhatsApp if whatsappEnabled, only alert overdue if alertOverdue, etc.)
+  2. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
+  3. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
+  4. **Bulk action progress** — for 50+ invoices, show a live progress bar instead of a single spinner
+  5. **Theme-aware comparison chart** — apply useChartTheme to the invoice-comparison LineChart

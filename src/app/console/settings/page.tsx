@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Landmark, Percent, Database, KeyRound, User, ShieldCheck, Loader2, Lock } from "lucide-react";
 import { PageHead, KeyVal, fmtDate } from "@/components/console/kit";
+import { DigestPreferences } from "@/components/console/digest-preferences";
 import { cn } from "@/lib/utils";
 
 type SessionDTO = {
@@ -123,6 +124,11 @@ export default function SettingsPage() {
             Books or a CSV drop. Nothing in your books is ever modified.
           </p>
         </section>
+
+        {/* Digest preferences */}
+        <div className="lg:col-span-2">
+          <DigestPreferences />
+        </div>
 
         {/* Danger zone */}
         <section className="rounded-xl border border-alert/25 bg-alert/[0.03] p-5 lg:col-span-2">

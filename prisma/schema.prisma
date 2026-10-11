@@ -24,6 +24,7 @@ model Org {
   insights  Insight[]
   imports   ImportBatch[]
   auditLogs AuditLog[]
+  digest    DigestPreference?
 }
 
 model User {
@@ -168,4 +169,25 @@ model AuditLog {
   org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, createdAt])
+}
+
+/* ----- New: email digest preferences per org ----- */
+model DigestPreference {
+  id              String   @id @default(cuid())
+  orgId           String   @unique
+  emailEnabled    Boolean  @default(true)
+  whatsappEnabled Boolean  @default(false)
+  smsEnabled      Boolean  @default(false)
+  // alert triggers
+  alertOverdue    Boolean  @default(true) // invoice crosses day 45
+  alertClockRisk  Boolean  @default(true) // MSEFC clock ≤ 14 days
+  alertForecast   Boolean  @default(false) // weekly forecast digest
+  alertRecovery   Boolean  @default(true) // money recovered
+  alertInsight    Boolean  @default(false) // new AI insight generated
+  // threshold for forecast alerts (₹ per day)
+  forecastThreshold Int    @default(10000)
+  // cadence: instant | daily | weekly
+  cadence         String   @default("instant")
+  updatedAt       DateTime @updatedAt
+  org             Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
