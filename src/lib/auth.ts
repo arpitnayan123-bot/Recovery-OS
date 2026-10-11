@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "./recovery";
+import { secureCookieOpts } from "./security";
 
 /**
  * Recovery OS — authentication + session layer.
@@ -10,12 +11,7 @@ import { prisma } from "./recovery";
  */
 
 export const USER_COOKIE = "ros_user";
-const COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: 60 * 60 * 24 * 30, // 30 days
-};
+const COOKIE_OPTS = secureCookieOpts();
 
 export const SESSION_COOKIE = "ros_org"; // re-exported name used elsewhere
 
@@ -37,7 +33,7 @@ export async function getSessionUser() {
       where: { id: userId },
       select: { id: true, email: true, name: true, phone: true, createdAt: true },
     });
-  } catch {
+  } catch (e) { console.error("[session-lookup]", e);
     return null;
   }
 }
