@@ -9,7 +9,7 @@ export async function getSessionOrg() {
   if (!orgId) return null;
   try {
     return await prisma.org.findUnique({ where: { id: orgId } });
-  } catch {
+  } catch (e) { console.error("[session-lookup]", e);
     return null;
   }
 }

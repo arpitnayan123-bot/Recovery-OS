@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       });
       if (existing) return NextResponse.redirect(new URL("/console", req.url), 303);
     }
-  } catch {
+  } catch (e) { console.error("[session-lookup]", e);
     /* cookie lookup failure must never block demo creation */
   }
 
