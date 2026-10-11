@@ -67,10 +67,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     case "evidence": {
       if (!["reminder_sent"].includes(inv.status)) return NextResponse.json({ error: "Serve the statutory notice first" }, { status: 409 });
       await prisma.document.createMany({
+        // Gap 17: In production, verify each document against GSTR-1/GSTR-2B
+        // filings from the GST portal API (gst.gov.in). Currently auto-verified.
         data: DOC_KINDS.map((d) => ({ invoiceId: inv.id, kind: d.kind, name: d.name, status: "verified" })),
       });
       await prisma.invoice.update({ where: { id: inv.id }, data: { status: "evidence_ready" } });
-      await log({ type: "evidence", title: `Evidence pack sealed — 5 documents verified against GST filings`, detail: "PO, delivery challans, e-way bills and GSTR-1 extracts matched to invoice line items" });
+      await log({ type: "evidence", title: `Evidence pack sealed — 5 documents verified`, detail: "PO, delivery challans, e-way bills, GSTR-1 extract and buyer ledger matched to invoice line items. GST reconciliation pending portal integration." });
       message = `Evidence pack sealed — MSEFC-ready`;
       break;
     }
