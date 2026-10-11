@@ -3,6 +3,7 @@ import { prisma, buildStatutoryNotice, daysOverdue, invoiceInterest, MSEFC_DECIS
 import { audit, AUDIT } from "@/lib/auth";
 
 const DAY = 86_400_000;
+const MONTHLY = ((5.75 * 3) / 100) / 12; // §16 monthly compound rate
 
 /**
  * GET/POST /api/cron/tick?secret=...
@@ -33,7 +34,8 @@ async function runTick() {
   let queued = 0;
   let promoted = 0;
   let clockAlerts = 0;
-  const perOrg: { org: string; queued: number; promoted: number; clockAlerts: number }[] = [];
+  let forecastAlerts = 0;
+  const perOrg: { org: string; queued: number; promoted: number; clockAlerts: number; forecastAlerts?: number }[] = [];
 
   for (const org of orgs) {
     // load this org's digest preferences (or defaults)
@@ -43,10 +45,13 @@ async function runTick() {
     const smsOn = prefs?.smsEnabled ?? false;
     const alertOverdue = prefs?.alertOverdue ?? true;
     const alertClockRisk = prefs?.alertClockRisk ?? true;
+    const alertForecast = prefs?.alertForecast ?? false;
+    const forecastThreshold = prefs?.forecastThreshold ?? 10000;
 
     let orgQueued = 0;
     let orgPromoted = 0;
     let orgClockAlerts = 0;
+    let orgForecastAlert = 0;
 
     // 1. overdue watch invoices → statutory ladder
     if (alertOverdue) {
@@ -124,17 +129,59 @@ async function runTick() {
       }
     }
 
-    if (orgQueued > 0 || orgClockAlerts > 0) {
-      perOrg.push({ org: org.name, queued: orgQueued, promoted: orgPromoted, clockAlerts: orgClockAlerts });
+    // 3. forecast threshold — queue an alert if the daily §16 bleed exceeds the org's threshold
+    if (alertForecast && (emailOn || whatsappOn || smsOn)) {
+      const liveInvoices = await prisma.invoice.findMany({
+        where: { orgId: org.id, status: { not: "recovered" } },
+      });
+      const perDay = liveInvoices.reduce((s, inv) => {
+        const od = Math.max(0, Math.floor((now.getTime() - inv.dueOn.getTime()) / DAY));
+        if (od <= 0) return s;
+        return s + (inv.amount * Math.pow(1 + MONTHLY, od / 30) - inv.amount) / 30 * (MONTHLY / (1 + MONTHLY));
+      }, 0) * 30; // approx per-day
+      if (perDay >= forecastThreshold) {
+        // only alert once per day — check if we already queued a forecast reminder today
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        const existingForecast = await prisma.event.findFirst({
+          where: { orgId: org.id, type: "system", title: { contains: "Forecast threshold" }, createdAt: { gte: todayStart } },
+        });
+        if (!existingForecast) {
+          const channel = emailOn ? "email" : whatsappOn ? "whatsapp" : "sms";
+          // attach to the first live invoice (best-effort)
+          const firstInv = liveInvoices[0];
+          if (firstInv) {
+            await prisma.reminder.create({
+              data: {
+                invoiceId: firstInv.id,
+                channel,
+                kind: "statutory",
+                subject: `Recovery OS — daily §16 bleed exceeded ₹${forecastThreshold.toLocaleString("en-IN")}`,
+                body: `Your portfolio is bleeding ₹${Math.round(perDay).toLocaleString("en-IN")}/day in §16 compound interest — above your alert threshold of ₹${forecastThreshold.toLocaleString("en-IN")}/day. Log in to Recovery OS to see the cost-of-inaction forecast and act.`,
+                status: "queued",
+              },
+            });
+            await prisma.event.create({
+              data: { orgId: org.id, invoiceId: firstInv.id, type: "system", title: `Forecast threshold alert — ₹${Math.round(perDay).toLocaleString("en-IN")}/day bleed`, detail: `Exceeded the ₹${forecastThreshold.toLocaleString("en-IN")}/day threshold. ${channel} alert queued.` },
+            });
+            orgForecastAlert++;
+          }
+        }
+      }
+    }
+
+    if (orgQueued > 0 || orgClockAlerts > 0 || orgForecastAlert) {
+      perOrg.push({ org: org.name, queued: orgQueued, promoted: orgPromoted, clockAlerts: orgClockAlerts, forecastAlerts: orgForecastAlert });
     }
     queued += orgQueued;
     promoted += orgPromoted;
     clockAlerts += orgClockAlerts;
+    forecastAlerts += orgForecastAlert;
   }
 
-  if (orgs[0]) await audit(orgs[0].id, "system", AUDIT.CRON_TICK, { scanned, queued, promoted, clockAlerts, orgs: orgs.length });
+  if (orgs[0]) await audit(orgs[0].id, "system", AUDIT.CRON_TICK, { scanned, queued, promoted, clockAlerts, forecastAlerts, orgs: orgs.length });
 
-  return { scanned, queued, promoted, clockAlerts, perOrg, ranAt: now.toISOString() };
+  return { scanned, queued, promoted, clockAlerts, forecastAlerts, perOrg, ranAt: now.toISOString() };
 }
 
 export async function GET(req: Request) {

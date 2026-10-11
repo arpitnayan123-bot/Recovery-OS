@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { GitCompare, X, TrendingUp, Clock, IndianRupee } from "lucide-react";
+import { GitCompare, X, TrendingUp, Clock, IndianRupee, FileDown } from "lucide-react";
 import { inrCompact, StatusChip } from "@/components/console/kit";
 import { useChartTheme } from "@/components/console/chart-theme";
 import { inr } from "@/lib/format";
@@ -99,9 +99,19 @@ export function InvoiceComparison({ ids, onClose }: { ids: string[]; onClose: ()
               <p className="text-[11.5px] text-muted-foreground">{items.length} invoices · 90-day §16 projection · side-by-side</p>
             </div>
           </div>
-          <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/invoices/compare/pdf?ids=${ids.join(",")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-mint/30 bg-mint/[0.06] px-3 h-8 text-[11.5px] font-medium text-mint transition-colors hover:bg-mint/[0.12]"
+            >
+              <FileDown className="h-3.5 w-3.5" /> Export PDF
+            </a>
+            <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground" aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto p-5" style={{ scrollbarWidth: "thin" }}>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Mail, MessageSquare, Smartphone, Bell, Clock, TrendingUp, Award, Sparkles, Loader2 } from "lucide-react";
+import { Mail, MessageSquare, Smartphone, Bell, Clock, TrendingUp, Award, Sparkles, Loader2, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Prefs = {
@@ -64,6 +64,17 @@ export function DigestPreferences() {
       toast.success("Digest preferences saved.");
       qc.invalidateQueries({ queryKey: ["digest"] });
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const testSend = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/digest/test", { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.error ?? "Test failed");
+      return d;
+    },
+    onSuccess: (d) => toast.success(d.message),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -197,11 +208,23 @@ export function DigestPreferences() {
         </div>
       </div>
 
-      {save.isPending && (
-        <p className="mt-3 flex items-center gap-1.5 font-mono text-[9.5px] tracking-[0.12em] uppercase text-mint">
-          <Loader2 className="h-3 w-3 animate-spin" /> saving…
-        </p>
-      )}
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+        {save.isPending ? (
+          <p className="flex items-center gap-1.5 font-mono text-[9.5px] tracking-[0.12em] uppercase text-mint">
+            <Loader2 className="h-3 w-3 animate-spin" /> saving…
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Changes save automatically.</p>
+        )}
+        <button
+          onClick={() => testSend.mutate()}
+          disabled={testSend.isPending || (!prefs.emailEnabled && !prefs.whatsappEnabled && !prefs.smsEnabled)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-mint/30 bg-mint/[0.06] px-3 h-9 text-[11.5px] font-medium text-mint transition-colors hover:bg-mint/[0.12] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {testSend.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          {testSend.isPending ? "Sending…" : "Send test alert"}
+        </button>
+      </div>
     </section>
   );
 }
