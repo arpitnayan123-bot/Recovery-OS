@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Search, Inbox, ChevronRight, FileText, Send, FolderCheck, Scale, Landmark as Award, Upload, Download, Send as SendBulk, X, CheckSquare } from "lucide-react";
+import { RefreshCw, Plus, Search, Inbox, ChevronRight, FileText, Send, FolderCheck, Scale, Landmark as Award, Upload, Download, Send as SendBulk, X, CheckSquare, GitCompare } from "lucide-react";
 import { PageHead, StatusChip, LiveInterest, EmptyState, fmtDate, inrCompact } from "./kit";
 import { inr } from "@/lib/format";
 import { InvoiceDrawer } from "./invoice-drawer";
 import { ImportCsvDialog } from "./import-dialog";
+import { InvoiceComparison } from "./invoice-comparison";
 import type { InvoiceDTO } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,8 @@ export default function InvoicesPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const selectedIds = useMemo(() => Array.from(selected).slice(0, 4), [selected]);
 
   const { data, isLoading } = useQuery<{ invoices: InvoiceDTO[] }>({
     queryKey: ["invoices"],
@@ -177,6 +180,14 @@ export default function InvoicesPage() {
             <button onClick={clearSelection} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 h-8 text-[11.5px] text-muted-foreground transition-colors hover:text-foreground">
               <X className="h-3 w-3" /> Clear
             </button>
+            {selectedIds.length >= 2 && (
+              <button
+                onClick={() => setCompareOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-mint/30 bg-mint/[0.06] px-3 h-8 text-[11.5px] font-medium text-mint transition-colors hover:bg-mint/[0.12]"
+              >
+                <GitCompare className="h-3.5 w-3.5" /> Compare {selectedIds.length}
+              </button>
+            )}
             {selectedEligible.length > 0 && (
               <button
                 onClick={() => setBulkOpen(true)}
@@ -250,7 +261,7 @@ export default function InvoicesPage() {
                     )}
                   >
                     <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
-                      {isEligible && (
+                      {!done && (
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -314,6 +325,9 @@ export default function InvoicesPage() {
           onClose={() => setBulkOpen(false)}
           onDone={() => { clearSelection(); setBulkOpen(false); }}
         />
+      ) : null}
+      {compareOpen && selectedIds.length >= 2 ? (
+        <InvoiceComparison ids={selectedIds} onClose={() => setCompareOpen(false)} />
       ) : null}
     </>
   );

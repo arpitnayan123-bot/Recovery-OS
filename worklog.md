@@ -290,3 +290,51 @@ This round added **2 new features + styling polish** (mandatory per cron instruc
   3. **Invoice comparison view** — select 2-3 invoices and compare their forecast projections side-by-side
   4. **Theme-aware charts** — make the recharts tooltips/axis colors respond to the active theme (currently hardcoded for dark)
   5. **Keyboard shortcuts help** — a `?` overlay showing all available shortcuts (Cmd+K, Esc, etc.)
+
+---
+Task ID: 6
+Agent: Super Z (cron review — webDevReview)
+Task: Assess current project status, perform QA via agent-browser, then add features + styling polish.
+
+## Current project status description/assessment
+- Recovery OS is stable and fully functional coming into this round. All 13 console routes + 13 API routes return 200, lint clean, zero console errors.
+- QA verified via agent-browser: overview (with forecast card + chart + theme toggle), invoices, cases, buyers, insights, analytics, activity, audit, settings, signup, login, homepage all render without errors. Previous rounds' features (command palette, notifications, CSV export, animated counters, recovery forecast + chart, PDF documents panel, settings account, bulk invoice actions, AI forecast narrative, invoice-level forecast, theme toggle) all confirmed working.
+- No bugs, runtime errors, or build failures found — project is in a stable phase, so work focused on new high-impact features from the worklog's recommended next-phase list.
+
+## Current goals/completed modifications/verification results
+This round added **2 new features + styling polish** (mandatory per cron instructions):
+
+### Feature 1 — Keyboard shortcuts help overlay + global nav ✅
+- New component: `src/components/console/shortcuts-help.tsx` — a `?`-key-triggered full-screen overlay (framer-motion) showing all keyboard shortcuts organized into 3 groups (Navigation, Invoices, Recovery). Each shortcut shows a description + kbd-styled key caps. Closes on Esc or overlay click.
+- New hook: `src/hooks/use-keyboard-nav.ts` — `g`-prefix navigation: press `g` then a letter to jump to a page (`g+o` overview, `g+i` invoices, `g+c` cases, `g+b` buyers, `g+a` analytics, `g+s` insights, `g+d` audit, `g+t` settings). Ignores keys typed in inputs and respects modifier keys. 1.2s prefix timeout.
+- Wired into the console shell: ShortcutsHelp rendered at the root; useKeyboardNav called in Shell; a `?` hint button added to the desktop topbar (next to the search trigger) that dispatches a synthetic `?` keydown to open the overlay.
+- E2E: clicked `?` button → overlay opened showing "Keyboard shortcuts" with Navigation/Invoices/Recovery groups → Esc closed it. `g+o` navigated from /console/invoices to /console (overview). `g+b` navigated to /console/buyers.
+
+### Feature 2 — Invoice comparison view (side-by-side forecast) ✅
+- New API: `/api/invoices/compare?ids=id1,id2,id3` (GET) — accepts 2-4 invoice IDs, returns a side-by-side comparison with each invoice's §16 projection curve (day 0 → 90, step 5, 19 points) + key metrics (principal, interest now, total claimable, per-day bleed, 90-day bleed, status, days overdue). Uses the same compound-interest engine.
+- New component: `src/components/console/invoice-comparison.tsx` — a full-screen modal with: a multi-line recharts LineChart (one line per invoice, the fastest-bleeding one thickened), a "winner" callout identifying the worst leak with its 90-day bleed, and side-by-side metric cards (color-coded by comparison position, the winner highlighted in alert red). Skeleton loader while fetching.
+- Wired into the invoices page: per-row checkboxes now appear for any non-recovered invoice (not just bulk-serve-eligible). A "Compare N" button appears in the selection bar when 2+ invoices are selected.
+- E2E: selected 3 invoices → "Compare 3" button appeared → clicked → comparison modal rendered with multi-line chart + winner callout ("ORBT/2231 is bleeding the fastest — ₹1,09,168 over 90 days. Recover it first.") + 3 metric cards with 90-day bleed / total claimable.
+
+### Styling polish ✅
+- Keyboard-first UX: `?` hint button in the topbar with a kbd-styled label
+- Comparison chart: multi-line with color-coded legends, the worst-leak line thickened for emphasis
+- Comparison cards: staggered framer-motion entrance, winner card highlighted in alert red
+- Shortcuts overlay: 3-column layout with kbd key caps, smooth entrance animation
+
+### Verification
+- `bun run lint` clean (0 problems, 0 warnings)
+- All 13 routes return 200
+- New APIs: `/api/invoices/compare?ids=...` 200 (returns 3-item comparison with 19-point curves each)
+- agent-browser E2E: shortcuts overlay opens via `?` button + closes via Esc, `g+o`/`g+b` keyboard navigation works, comparison modal renders with chart + winner callout + metric cards, mobile 390px shortcuts overlay responsive, zero console errors
+- Fixed: `Esc` icon import (doesn't exist in lucide-react → replaced with kbd element)
+- Artifacts: download/qa-r6-1-overview.png, qa-r6-2-comparison.png, qa-r6-3-mobile-shortcuts.png, qa-r6-4-final.png
+
+## Unresolved issues or risks, and priority recommendations for the next phase
+- **No bugs or risks identified** — all features verified working, lint clean, zero errors
+- Recommended next-phase features (in priority order):
+  1. **Bulk evidence pack + ODR filing** — extend the bulk API to support "seal evidence" and "file on ODR" actions (the API already accepts an `action` parameter; just add the handlers + UI buttons)
+  2. **Email digest preferences** — let users choose which forecast thresholds / clock-risk events trigger email alerts (ties into the reminder engine)
+  3. **Theme-aware charts** — make the recharts tooltips/axis colors respond to the active theme (currently hardcoded for dark)
+  4. **Comparison export** — let users export the comparison chart as a PDF/image for sharing with stakeholders
+  5. **Keyboard shortcut for "explain forecast"** — wire the `e` shortcut listed in the help to actually trigger the AI narrative button
