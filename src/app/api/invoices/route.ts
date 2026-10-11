@@ -9,15 +9,21 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const filter = searchParams.get("filter") ?? "all";
+  const limit = Math.min(100, Number(searchParams.get("limit")) || 100);
+  const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
   const invoices = await prisma.invoice.findMany({
     where: { orgId: org.id },
     include: { ...invoiceInclude, events: { take: 1, orderBy: { createdAt: "desc" } } },
     orderBy: { createdAt: "desc" },
+    take: limit + 1, // fetch one extra to check if there's a next page
+    skip: offset,
   });
+  const hasMore = invoices.length > limit;
+  const pageInvoices = hasMore ? invoices.slice(0, limit) : invoices;
 
   const now = new Date();
-  let rows = invoices.map((inv) => serializeInvoice(inv, now));
+  let rows = pageInvoices.map((inv) => serializeInvoice(inv, now));
 
   if (filter === "watch") rows = rows.filter((r) => r.status === "watch");
   if (filter === "overdue") rows = rows.filter((r) => r.status !== "recovered" && r.daysOverdue > 0);
@@ -34,7 +40,7 @@ export async function GET(req: Request) {
     };
   });
 
-  return NextResponse.json({ invoices: rows, pipeline });
+  return NextResponse.json({ invoices: rows, pipeline, pagination: { limit, offset, hasMore, count: rows.length } });
 }
 
 /** Manual invoice entry */
