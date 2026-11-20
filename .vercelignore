@@ -1,0 +1,19 @@
+# Non-app assets that should never be uploaded to Vercel.
+# The deployment surface is the Next.js app in the repo root.
+
+# Agent-skill library (docs + offline scripts, not runtime services)
+skills/
+
+# Local QA artifacts from development
+download/
+tool-results/
+worklog.md
+scripts/*.png
+tests/
+
+# Local SQLite database — Vercel is serverless; use a managed PostgreSQL (DATABASE_URL)
+db/
+
+# Loose media that no code path references
+public/screenshots/
+public/media/hero.mp4

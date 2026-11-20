@@ -103,17 +103,16 @@ Every invoice moves through these stages. Each stage is one click per invoice, w
 │  ─ Settings (org + account + digest prefs + danger zone)           │
 │  ─ Lawyers (advocate network placeholder)                           │
 │                                                                     │
-│  Pico — 3D mascot on every page (draggable + chat + voice)         │
 │  Compliance OS (/compliance) — buyer-side §43B(h) product           │
 ├─────────────────────────────────────────────────────────────────────┤
-│  API layer (34 route handlers, org-scoped, rate-limited)            │
+│  API layer (33 route handlers, org-scoped, rate-limited)            │
 │  /api/auth/*  /api/session  /api/onboard  /api/overview            │
 │  /api/invoices/*  /api/cases  /api/buyers  /api/events             │
 │  /api/insights (LLM)  /api/forecast (LLM)  /api/analytics          │
 │  /api/documents/[id] (PDF)  /api/samadhaan/[id] (MSEFC form)      │
 │  /api/imports (CSV/Tally)  /api/cron/tick (reminder engine)        │
 │  /api/digest (prefs)  /api/audit  /api/profile  /api/search        │
-│  /api/pico/chat (LLM)  /api/invoices/bulk  /api/invoices/compare  │
+│  /api/invoices/bulk  /api/invoices/compare                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Domain core (pure, client-safe) — lib/domain.ts                   │
 │  §16 monthly-compound interest · stage machine · statutory notice   │
@@ -147,7 +146,6 @@ Every invoice moves through these stages. Each stage is one click per invoice, w
 | Auth | bcryptjs + httpOnly cookies (DB-backed, revocable) |
 | AI | Z-AI Web Dev SDK (LLM chat + web search + image gen) |
 | PDF | pdf-lib (statutory notice, evidence pack, ODR dossier) |
-| Mascot | Pico (custom 3D avatar with 24 animations) |
 | Icons | Lucide React |
 | Validation | Zod |
 | Security | Rate limiting + CSRF + secure cookies |
@@ -198,7 +196,6 @@ Every invoice moves through these stages. Each stage is one click per invoice, w
 - **Recovery Insights** — LLM reads the portfolio and produces a prioritised action plan (P0-P3 actions, risk flags, opportunities)
 - **Forecast Narrative** — LLM narrates the cost-of-inaction in plain English with real invoice numbers
 - **Buyer Due Diligence** — web search + LLM synthesises a buyer risk report (level, score, signals, sources)
-- **Pico Mascot** — 3D avatar (24 animations), draggable, chat with LLM (portfolio-aware), TTS voice, mute/unmute
 
 ### Documents
 - **Statutory Notice PDF** — §15/§16/§18/§19/§43B(h) demand letter (pdf-lib, A4)
@@ -275,6 +272,29 @@ DATABASE_URL=file:./db/custom.db          # SQLite (dev)
 
 ---
 
+## ▲ Deploying on Vercel
+
+The repo deploys as **one Vercel service** (`app`) — a single Next.js application whose API routes live in the same deployment (there are no separate backend processes to wire together).
+
+```bash
+npm i -g vercel
+vercel        # preview deploy
+vercel --prod # production deploy
+```
+
+Required setup in the Vercel dashboard (or via `vercel env add`):
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | a **PostgreSQL** connection string (Neon / Vercel Postgres / Supabase). SQLite is dev-only — the serverless filesystem is ephemeral, so data will not persist |
+
+On the first deploy the Prisma client is generated automatically (`postinstall` + `build` both run `prisma generate`). To create the tables in your Postgres database, run `bunx prisma db push` locally with `DATABASE_URL` pointing at it (or `prisma migrate deploy` once migrations exist). The demo workspace seeds itself on demand — press **"Use demo sign in"** on a fresh database and it populates.
+
+Notes:
+- `vercel.json` defines the single `app` service and routes all traffic to it.
+- `.vercelignore` keeps deploys lean by excluding non-app assets (agent skills, QA screenshots, the local SQLite file).
+- The LLM-backed routes (`/api/insights`, `/api/forecast`, `/api/buyers/[id]/diligence`) use the Z-AI SDK when credentials are available and fall back to deterministic heuristics otherwise — they never 500 because of a missing provider.
+
 ## 📡 API Surface
 
 | Endpoint | Method | Purpose |
@@ -311,7 +331,6 @@ DATABASE_URL=file:./db/custom.db          # SQLite (dev)
 | `/api/audit` | GET | Audit log + import batches |
 | `/api/profile` | GET | Full consumer profile |
 | `/api/search` | GET | Command palette search |
-| `/api/pico/chat` | POST | Pico LLM chat (portfolio-aware) |
 
 ---
 
@@ -344,18 +363,6 @@ DATABASE_URL=file:./db/custom.db          # SQLite (dev)
 - **bcrypt** — passwords hashed with 10 rounds
 - **DB-backed sessions** — cookie holds userId, validated on every request
 - **Multi-tenant scoping** — every query includes `orgId` (PostgreSQL RLS recommended for production)
-
----
-
-## 🎭 Pico — Your Recovery OS Companion
-
-Pico is a 3D animated cloud-sphere mascot with **24 expressions** (happy, thinking, curious, excited, proud, celebrate, sad, etc.). He appears on every page (homepage, login, console) as a floating, draggable companion.
-
-- **Tap to chat** — ask Pico about Recovery OS, the MSMED Act, or your portfolio
-- **Voice (TTS)** — Pico speaks his responses (rate 1.05, pitch 1.2)
-- **Mute/unmute** — toggle voice in the chat header
-- **Drag to move** — grab Pico and place him anywhere (position persists)
-- **Portfolio-aware** — Pico's chat includes your live KPIs when you have a session
 
 ---
 
@@ -395,18 +402,17 @@ Nothing here is legal advice. Filings are prepared for the owner's review.
 src/
 ├── app/
 │   ├── page.tsx                    # marketing site
-│   ├── layout.tsx                  # root layout (Pico + metadata)
+│   ├── layout.tsx                  # root layout (metadata + JSON-LD)
 │   ├── login/ + signup/            # auth pages
 │   ├── onboarding/                  # wizard + instant demo route
 │   ├── compliance/                  # buyer-side §43B(h) product
 │   ├── console/                    # 12 pages (overview → settings)
-│   └── api/                        # 34 route handlers
+│   └── api/                        # 33 route handlers
 ├── components/
 │   ├── site/                       # nav, hero, calculator, sections
 │   ├── console/                    # shell, drawer, kit, forecast, etc.
 │   ├── originkit/                  # Hero 24 (globe, hands, scale frames)
-│   ├── cloudee/                    # Pico 3D avatar runtime
-│   └── pico/                       # Pico widget + boundary
+│   └── three/                      # 3D primitives
 ├── lib/
 │   ├── domain.ts                   # pure §16 logic + notice + pricing
 │   ├── recovery.ts                 # Prisma + demo seeding
